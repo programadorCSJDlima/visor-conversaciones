@@ -9,6 +9,8 @@ services:
       PUERTO: 3001
       # En Docker el frontend lo sirve nginx, no el backend
       FRONTEND_DIST: ""
+      # El backend solo recibe tráfico de nginx, que envía la IP real del usuario
+      DETRAS_DE_PROXY: "1"
     init: true
     restart: unless-stopped
 

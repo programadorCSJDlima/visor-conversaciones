@@ -24,7 +24,14 @@ PUERTO=3001
 ```
 
 Si el visor va a quedar accesible en la red, definir `VISOR_USUARIO` y `VISOR_CLAVE`
-para que pida usuario y clave (los mensajes incluyen datos de pacientes).
+(los mensajes incluyen datos de pacientes). Con eso la app muestra una pantalla de login:
+
+- La sesión dura 12 horas y se guarda en una cookie `HttpOnly`.
+- Tras 5 intentos fallidos desde la misma IP, el login se bloquea 5 minutos.
+- Reiniciar el backend cierra las sesiones, salvo que se defina `VISOR_SECRETO`
+  (cualquier texto largo y aleatorio) para firmarlas siempre con la misma clave.
+
+Sin `VISOR_USUARIO`/`VISOR_CLAVE` el visor abre directo, sin login (útil en desarrollo).
 
 ```
 cd backend
@@ -37,6 +44,9 @@ Endpoints:
 
 | Método | Ruta | Descripción |
 | --- | --- | --- |
+| POST | `/api/login` | `{ usuario, clave }` → crea la cookie de sesión |
+| POST | `/api/logout` | Cierra la sesión |
+| GET | `/api/sesion` | Usuario de la sesión actual (401 si no hay) |
 | GET | `/api/conversaciones?q=` | Conversaciones por teléfono, ordenadas por actividad |
 | GET | `/api/conversaciones/:telefono` | Estado del bot y datos del paciente |
 | GET | `/api/conversaciones/:telefono/mensajes?antes=&despues=` | Mensajes (paginados por id) |

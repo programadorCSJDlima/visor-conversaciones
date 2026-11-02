@@ -1,37 +1,26 @@
-import { createHash, timingSafeEqual } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
+import { requiereSesion, rutasAuth } from './auth.js';
 import { pool } from './db.js';
 import { aMensaje } from './mensajes.js';
 
 const app = express();
 const PUERTO = Number(process.env.PUERTO || 3001);
 
-// Usado por el healthcheck de Docker; va antes de la autenticación y no expone datos
+// Detrás de nginx (Docker) la IP real del usuario llega en X-Forwarded-For;
+// se usa para limitar los intentos de login por IP
+if (process.env.DETRAS_DE_PROXY) app.set('trust proxy', 1);
+
+// Usado por el healthcheck de Docker; va antes del login y no expone datos
 app.get('/api/salud', async (req, res) => {
   await pool.query('select 1');
   res.json({ ok: true });
 });
 
-// Autenticación básica opcional: se activa si VISOR_USUARIO y VISOR_CLAVE están en el .env
-const { VISOR_USUARIO, VISOR_CLAVE } = process.env;
-if (VISOR_USUARIO && VISOR_CLAVE) {
-  const hash = (s) => createHash('sha256').update(s).digest();
-  const esperado = hash(`${VISOR_USUARIO}:${VISOR_CLAVE}`);
-  app.use((req, res, next) => {
-    const [esquema, cred] = (req.headers.authorization ?? '').split(' ');
-    if (esquema === 'Basic' && cred) {
-      const recibido = hash(Buffer.from(cred, 'base64').toString());
-      if (timingSafeEqual(recibido, esperado)) return next();
-    }
-    res
-      .set('WWW-Authenticate', 'Basic realm="Visor de conversaciones", charset="UTF-8"')
-      .status(401)
-      .send('Autenticación requerida');
-  });
-}
+app.use(rutasAuth);
+app.use('/api', requiereSesion);
 
 const comoLike = (q) => `%${q.replace(/[\\%_]/g, '\\$&')}%`;
 
