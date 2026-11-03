@@ -51,6 +51,7 @@ Endpoints:
 | GET | `/api/conversaciones/:telefono` | Estado del bot y datos del paciente |
 | GET | `/api/conversaciones/:telefono/mensajes?antes=&despues=` | Mensajes (paginados por id) |
 | GET | `/api/mensajes/:id` | Mensaje con su payload completo de WhatsApp |
+| GET | `/api/estadisticas?dias=1\|7\|30\|90\|0` | Todo lo que muestra el panel (0 = todo el historial) |
 
 ## Frontend
 
@@ -133,3 +134,25 @@ docker compose up -d
 - Panel de detalle con el estado actual del bot y los datos del paciente.
 - Se actualiza solo: la lista cada 15 s y el chat abierto cada 5 s.
 - El enlace `#/<telefono>` abre directamente una conversación.
+
+### Panel (`#/panel`)
+
+Estadísticas filtrables por periodo (hoy, 7, 30, 90 días o todo), comparadas con el
+periodo anterior y actualizadas cada minuto:
+
+- **Indicadores:** conversaciones, citas registradas (y su valor), conversión a cita,
+  recaudado en línea, tiempo de respuesta del bot (mediana y p95) y errores de envío.
+- **Actividad** por día (o por hora en "Hoy").
+- **Embudo de citas:** cuántas personas iniciaron, se identificaron, eligieron horario,
+  registraron cita y pagaron.
+- **¿Cuándo escriben?:** mapa de calor por día de la semana y hora.
+- **Cómo responden:** texto libre vs botones, listas y formularios.
+- **Citas por especialidad** y **médicos más solicitados**.
+- **Pagos en línea:** links pagados, vencidos, prefacturas y facturas.
+- **Botones más usados**, **dónde quedaron las conversaciones** y **errores recientes**.
+
+Cada gráfico tiene un botón **Tabla** con los datos exactos.
+
+Las citas se cuentan a partir del mensaje de confirmación que envía el bot
+("Tu cita quedó registrada" con N° de cita, especialidad, médico y precio). Si cambia
+ese texto en el chatbot, hay que ajustar `backend/src/estadisticas.js`.

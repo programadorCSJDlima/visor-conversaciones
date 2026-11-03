@@ -105,10 +105,61 @@ h3 {
 
 /* ---------- Layout ---------- */
 
+.principal {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.barra-superior {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 48px;
+  flex-shrink: 0;
+  padding: 0 12px 0 16px;
+  background: var(--superficie);
+  border-bottom: 1px solid var(--borde);
+}
+
+.marca {
+  font-weight: 700;
+  margin-right: 16px;
+}
+
+.pestana {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  color: var(--tenue);
+  text-decoration: none;
+  font-weight: 500;
+  border-bottom: 2px solid transparent;
+}
+
+.pestana:hover {
+  color: var(--texto);
+}
+
+.pestana.activa {
+  color: var(--acento);
+  border-bottom-color: var(--acento);
+}
+
+.sesion {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
 .app {
   display: grid;
   grid-template-columns: 360px minmax(0, 1fr);
-  height: 100vh;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -138,10 +189,6 @@ h3 {
 
 .lista-cabecera h1 {
   font-size: 20px;
-}
-
-.lista-cabecera .salir {
-  margin-left: auto;
 }
 
 /* ---------- Login ---------- */

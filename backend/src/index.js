@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { requiereSesion, rutasAuth } from './auth.js';
 import { pool } from './db.js';
+import { estadisticas, PERIODOS } from './estadisticas.js';
 import { aMensaje } from './mensajes.js';
 
 const app = express();
@@ -23,6 +24,13 @@ app.use(rutasAuth);
 app.use('/api', requiereSesion);
 
 const comoLike = (q) => `%${q.replace(/[\\%_]/g, '\\$&')}%`;
+
+// ?dias=1|7|30|90|0 (0 = todo el historial)
+app.get('/api/estadisticas', async (req, res) => {
+  const dias = Number(req.query.dias ?? 30);
+  if (!PERIODOS.includes(dias)) return res.status(400).json({ error: `dias debe ser uno de: ${PERIODOS}` });
+  res.json(await estadisticas(dias));
+});
 
 app.get('/api/conversaciones', async (req, res) => {
   const q = req.query.q?.trim();

@@ -35,4 +35,5 @@ export const api = {
   mensajes: (t, params = {}) =>
     get(`/api/conversaciones/${tel(t)}/mensajes?${new URLSearchParams(params)}`),
   mensaje: (id) => get(`/api/mensajes/${id}`),
+  estadisticas: (dias) => get(`/api/estadisticas?dias=${dias}`),
 };

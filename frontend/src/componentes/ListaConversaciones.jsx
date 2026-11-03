@@ -10,27 +10,12 @@ function vistaPrevia(c) {
   return (c.ultimo_direccion === 'OUT' ? 'Bot: ' : '') + texto.replace(/[*_~]/g, '');
 }
 
-export default function ListaConversaciones({
-  conversaciones,
-  seleccionado,
-  onSeleccionar,
-  busqueda,
-  onBuscar,
-  cargando,
-  error,
-  usuario,
-  onSalir,
-}) {
+export default function ListaConversaciones({ conversaciones, seleccionado, onSeleccionar, busqueda, onBuscar, cargando, error }) {
   return (
     <nav className="lista">
       <header className="lista-cabecera">
         <h1>Conversaciones</h1>
         <span className="tenue">{conversaciones.length}</span>
-        {onSalir && (
-          <button className="boton-chico salir" onClick={onSalir} title={`Sesión de ${usuario}`}>
-            Salir
-          </button>
-        )}
       </header>
       <div className="buscador">
         <input

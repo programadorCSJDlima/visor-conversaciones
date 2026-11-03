@@ -6,9 +6,12 @@ import ListaConversaciones from './componentes/ListaConversaciones.jsx';
 const REFRESCO_LISTA_MS = 15000;
 
 // La conversación abierta vive en el hash (#/51999999999) para poder compartir el enlace
-const leerHash = () => decodeURIComponent(location.hash.replace(/^#\/?/, '')) || null;
+const leerHash = () => {
+  const valor = decodeURIComponent(location.hash.replace(/^#\/?/, ''));
+  return valor && valor !== 'panel' ? valor : null;
+};
 
-export default function Visor({ usuario, onSalir }) {
+export default function Visor() {
   const [telefono, setTelefono] = useState(leerHash);
   const [busqueda, setBusqueda] = useState('');
   const [filtro, setFiltro] = useState('');
@@ -61,8 +64,6 @@ export default function Visor({ usuario, onSalir }) {
         onBuscar={setBusqueda}
         cargando={cargando}
         error={error}
-        usuario={usuario}
-        onSalir={onSalir}
       />
       {telefono ? (
         <Chat key={telefono} telefono={telefono} resumen={resumen} onVolver={() => (location.hash = '')} />
