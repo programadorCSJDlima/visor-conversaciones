@@ -162,7 +162,10 @@ Cada cita que agendó el bot, con:
 - **Estado en Lolimsa**: si sigue existiendo, si está pagada (en caja o con el link) y si
   fue atendida. Una cita anulada en Lolimsa desaparece de `lolimsa.citas`, así que se
   muestra como **Anulada**.
-- **Estado final** para filtrar: pendiente de pago, pagada, atendida o anulada.
+- **Estado final** para filtrar: pendiente de pago, pagada por atender, atendida o anulada.
+  Cada cita está en un solo estado: una cita pagada y ya atendida cuenta como atendida.
+  Debajo de los filtros se muestra el total de pagadas (con link, en caja y ya atendidas).
+  El Panel, en cambio, cuenta solo las citas pagadas con link.
 
 Se puede buscar por paciente, documento, N° de cita, especialidad o médico y descargar
 la lista filtrada en CSV.

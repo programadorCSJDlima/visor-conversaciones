@@ -16,7 +16,8 @@ const REFRESCO_MS = 2 * 60 * 1000;
 // Estado de cada cita, con ícono para no depender solo del color
 const ESTADOS = {
   PENDIENTE: { nombre: 'Pendiente de pago', icono: '⏳', clase: 'aviso' },
-  PAGADA: { nombre: 'Pagada', icono: '✓', clase: 'bueno' },
+  // Una cita atendida también puede estar pagada, pero se cuenta en Atendida
+  PAGADA: { nombre: 'Pagada, por atender', icono: '✓', clase: 'bueno' },
   ATENDIDA: { nombre: 'Atendida', icono: '✓', clase: 'info' },
   ANULADA: { nombre: 'Anulada', icono: '✕', clase: 'critico' },
 };
@@ -352,6 +353,19 @@ export default function Citas() {
     return r;
   }, [datos]);
 
+  // Todas las pagadas, también las ya atendidas: con link (como cuenta el Panel) o en caja (según Lolimsa)
+  const pagos = useMemo(() => {
+    const pagadas = (datos?.citas ?? []).filter(
+      (c) => c.estado !== 'ANULADA' && (c.pago.estado === 'PAGADA' || c.lolimsa.pagada),
+    );
+    return {
+      total: pagadas.length,
+      conLink: pagadas.filter((c) => c.pago.estado === 'PAGADA').length,
+      enCaja: pagadas.filter((c) => c.pago.estado !== 'PAGADA').length,
+      atendidas: pagadas.filter((c) => c.estado === 'ATENDIDA').length,
+    };
+  }, [datos]);
+
   const visibles = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
     const lista = (datos?.citas ?? []).filter(
@@ -465,6 +479,15 @@ export default function Citas() {
               </button>
             ))}
           </section>
+
+          {pagos.total > 0 && (
+            <p className="resumen-pagos">
+              <span aria-hidden="true">✓</span> <strong>{pagos.total}</strong> pagadas en total:{' '}
+              <span className="tenue">
+                {pagos.conLink} con link · {pagos.enCaja} en caja · {pagos.atendidas} ya atendidas
+              </span>
+            </p>
+          )}
 
           <div className="tarjeta" ref={tablaRef}>
             <div className="barra-herramientas">

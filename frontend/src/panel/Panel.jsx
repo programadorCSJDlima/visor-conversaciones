@@ -304,7 +304,7 @@ export default function Panel() {
                       <dd>{soles.format(k.pagos.recaudado)}</dd>
                     </div>
                     <div>
-                      <dt>Citas pagadas</dt>
+                      <dt>Citas pagadas con link</dt>
                       <dd>{fmtNum.format(k.pagos.citasPagadas)}</dd>
                     </div>
                     <div>

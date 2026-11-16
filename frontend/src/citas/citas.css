@@ -152,6 +152,15 @@
   line-height: 1.2;
 }
 
+.resumen-pagos {
+  margin: -2px 0 12px;
+  font-size: 13px;
+}
+
+.resumen-pagos > span:first-child {
+  color: var(--bueno-texto);
+}
+
 /* ---------- Tabla ---------- */
 
 .barra-herramientas {
