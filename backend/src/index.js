@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { requiereSesion, rutasAuth } from './auth.js';
+import { citasAgendadas } from './citas.js';
 import { pool } from './db.js';
 import { estadisticas, PERIODOS } from './estadisticas.js';
 import { aMensaje } from './mensajes.js';
@@ -30,6 +31,14 @@ app.get('/api/estadisticas', async (req, res) => {
   const dias = Number(req.query.dias ?? 30);
   if (!PERIODOS.includes(dias)) return res.status(400).json({ error: `dias debe ser uno de: ${PERIODOS}` });
   res.json(await estadisticas(dias));
+});
+
+// Citas agendadas por el bot, con su pago por link y su estado en Lolimsa (mismos periodos que el panel)
+app.get('/api/citas', async (req, res) => {
+  const dias = Number(req.query.dias ?? 30);
+  if (!PERIODOS.includes(dias)) return res.status(400).json({ error: `dias debe ser uno de: ${PERIODOS}` });
+  // ?fresco=1 vuelve a consultar Lolimsa aunque haya una respuesta reciente en memoria
+  res.json(await citasAgendadas(dias, { fresco: req.query.fresco === '1' }));
 });
 
 app.get('/api/conversaciones', async (req, res) => {

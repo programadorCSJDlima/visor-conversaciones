@@ -52,6 +52,7 @@ Endpoints:
 | GET | `/api/conversaciones/:telefono/mensajes?antes=&despues=` | Mensajes (paginados por id) |
 | GET | `/api/mensajes/:id` | Mensaje con su payload completo de WhatsApp |
 | GET | `/api/estadisticas?dias=1\|7\|30\|90\|0` | Todo lo que muestra el panel (0 = todo el historial) |
+| GET | `/api/citas?dias=…&fresco=1` | Citas agendadas por el bot con su pago y su estado en Lolimsa (`fresco=1` no usa la respuesta guardada de Lolimsa) |
 
 ## Frontend
 
@@ -153,6 +154,39 @@ periodo anterior y actualizadas cada minuto:
 
 Cada gráfico tiene un botón **Tabla** con los datos exactos.
 
-Las citas se cuentan a partir del mensaje de confirmación que envía el bot
-("Tu cita quedó registrada" con N° de cita, especialidad, médico y precio). Si cambia
-ese texto en el chatbot, hay que ajustar `backend/src/estadisticas.js`.
+### Citas (`#/citas`)
+
+Cada cita que agendó el bot, con:
+
+- **Pago con link** (juanita_db): pagado, link activo, link vencido o sin link.
+- **Estado en Lolimsa**: si sigue existiendo, si está pagada (en caja o con el link) y si
+  fue atendida. Una cita anulada en Lolimsa desaparece de `lolimsa.citas`, así que se
+  muestra como **Anulada**.
+- **Estado final** para filtrar: pendiente de pago, pagada, atendida o anulada.
+
+Se puede buscar por paciente, documento, N° de cita, especialidad o médico y descargar
+la lista filtrada en CSV.
+
+Lolimsa se consulta a través de `api_csjd` (`GET /api/v1/citas?numeroDocumento=`), que ya
+tiene acceso a Oracle: el visor no necesita credenciales de Lolimsa. Requiere en
+`backend/.env`:
+
+```
+CSJD_API_URL=http://10.10.0.133:8081
+```
+
+Como esa API busca por documento, el visor identifica el documento de cada cita con el
+mensaje "Revisa tu cita" que el bot envía antes de confirmarla (muestra los últimos
+dígitos, p. ej. `DNI ••••8841`) y los documentos que el paciente escribió en la
+conversación. Las respuestas de Lolimsa se guardan 2 minutos en memoria; el botón
+**Actualizar** las vuelve a pedir.
+
+### Textos del bot que usa el visor
+
+Las citas (en el panel y en Citas) se leen de mensajes fijos del bot:
+
+- Confirmación: "Tu cita quedó registrada" con N° de cita, especialidad, médico,
+  consultorio, fecha, hora y precio.
+- Revisión previa: "Revisa tu cita" con el paciente y los últimos dígitos del documento.
+
+Si cambian esos textos en el chatbot, hay que ajustar `backend/src/confirmaciones.js`.

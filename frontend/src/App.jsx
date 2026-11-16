@@ -1,23 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, siExpiraSesion } from './api.js';
+import Citas from './citas/Citas.jsx';
 import Login from './componentes/Login.jsx';
 import Panel from './panel/Panel.jsx';
 import Visor from './Visor.jsx';
 
-const enPanel = () => location.hash === '#/panel';
+// #/citas y #/panel son vistas propias; cualquier otro hash es una conversación (#/51999999999)
+const VISTAS = { '#/citas': 'citas', '#/panel': 'panel' };
+const vistaActual = () => VISTAS[location.hash] ?? 'conversaciones';
 
 export default function App() {
   // undefined: verificando · null: sin sesión · objeto: sesión activa
   const [sesion, setSesion] = useState(undefined);
   const [error, setError] = useState(null);
-  const [panel, setPanel] = useState(enPanel);
-  // Al volver del panel se reabre la última conversación vista
-  const ultimaConversacion = useRef(enPanel() ? '#/' : location.hash || '#/');
+  const [vista, setVista] = useState(vistaActual);
+  // Al volver a Conversaciones se reabre la última conversación vista
+  const ultimaConversacion = useRef(vistaActual() === 'conversaciones' ? location.hash || '#/' : '#/');
 
   useEffect(() => {
     const alCambiar = () => {
-      setPanel(enPanel());
-      if (!enPanel()) ultimaConversacion.current = location.hash || '#/';
+      setVista(vistaActual());
+      if (vistaActual() === 'conversaciones') ultimaConversacion.current = location.hash || '#/';
     };
     window.addEventListener('hashchange', alCambiar);
     return () => window.removeEventListener('hashchange', alCambiar);
@@ -50,16 +53,20 @@ export default function App() {
   }
   if (sesion === undefined) return null;
   if (sesion === null) return <Login onIngresar={setSesion} />;
+
+  const pestana = (nombre, href, id) => (
+    <a className={`pestana ${vista === id ? 'activa' : ''}`} href={href}>
+      {nombre}
+    </a>
+  );
+
   return (
     <div className="principal">
       <nav className="barra-superior">
         <span className="marca">Juanita</span>
-        <a className={`pestana ${panel ? '' : 'activa'}`} href={ultimaConversacion.current}>
-          Conversaciones
-        </a>
-        <a className={`pestana ${panel ? 'activa' : ''}`} href="#/panel">
-          Panel
-        </a>
+        {pestana('Conversaciones', ultimaConversacion.current, 'conversaciones')}
+        {pestana('Citas', '#/citas', 'citas')}
+        {pestana('Panel', '#/panel', 'panel')}
         {sesion.conLogin && (
           <div className="sesion">
             <span className="tenue">{sesion.usuario}</span>
@@ -69,7 +76,9 @@ export default function App() {
           </div>
         )}
       </nav>
-      {panel ? <Panel /> : <Visor />}
+      {vista === 'panel' && <Panel />}
+      {vista === 'citas' && <Citas />}
+      {vista === 'conversaciones' && <Visor />}
     </div>
   );
 }

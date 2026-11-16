@@ -36,4 +36,5 @@ export const api = {
     get(`/api/conversaciones/${tel(t)}/mensajes?${new URLSearchParams(params)}`),
   mensaje: (id) => get(`/api/mensajes/${id}`),
   estadisticas: (dias) => get(`/api/estadisticas?dias=${dias}`),
+  citas: (dias, fresco) => get(`/api/citas?dias=${dias}${fresco ? '&fresco=1' : ''}`),
 };

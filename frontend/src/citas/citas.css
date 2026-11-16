@@ -1,0 +1,212 @@
+/* Estados: siempre ícono + texto, el color solo acompaña */
+.citas {
+  --bueno-fondo: #e3f5e8;
+  --bueno-texto: #006300;
+  --aviso-fondo: #fff4d6;
+  --aviso-texto: #8a5a00;
+  --serio-fondo: #fdeee7;
+  --serio-texto: #a8431b;
+  --critico-fondo: #fdecea;
+  --critico-texto: #c62828;
+  --info-fondo: #e3f0fb;
+  --info-texto: #0a5c9e;
+  --neutro-fondo: #eef0f2;
+  --neutro-texto: #556570;
+}
+
+.insignia {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.insignias {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.insignia.bueno {
+  background: var(--bueno-fondo);
+  color: var(--bueno-texto);
+}
+
+.insignia.aviso {
+  background: var(--aviso-fondo);
+  color: var(--aviso-texto);
+}
+
+.insignia.serio {
+  background: var(--serio-fondo);
+  color: var(--serio-texto);
+}
+
+.insignia.critico {
+  background: var(--critico-fondo);
+  color: var(--critico-texto);
+}
+
+.insignia.info {
+  background: var(--info-fondo);
+  color: var(--info-texto);
+}
+
+.insignia.neutro {
+  background: var(--neutro-fondo);
+  color: var(--neutro-texto);
+}
+
+/* ---------- Filtros por estado ---------- */
+
+.filtros-estado {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.filtro-estado {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--borde);
+  background: var(--superficie);
+  text-align: left;
+}
+
+.filtro-estado:hover {
+  border-color: var(--tenue);
+}
+
+.filtro-estado[aria-pressed='true'] {
+  border-color: var(--acento);
+  box-shadow: inset 0 0 0 1px var(--acento);
+}
+
+.filtro-nombre {
+  font-size: 13px;
+  color: var(--tenue);
+}
+
+.filtro-estado.bueno .filtro-nombre {
+  color: var(--bueno-texto);
+}
+
+.filtro-estado.aviso .filtro-nombre {
+  color: var(--aviso-texto);
+}
+
+.filtro-estado.critico .filtro-nombre {
+  color: var(--critico-texto);
+}
+
+.filtro-estado.info .filtro-nombre {
+  color: var(--info-texto);
+}
+
+.filtro-n {
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+/* ---------- Tabla ---------- */
+
+.barra-herramientas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.barra-herramientas input {
+  flex: 1;
+  min-width: 220px;
+  padding: 8px 12px;
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  background: var(--fondo);
+  font: inherit;
+}
+
+.barra-herramientas input:focus {
+  outline: 2px solid var(--acento);
+  outline-offset: -1px;
+  background: var(--superficie);
+}
+
+.barra-herramientas select {
+  font: inherit;
+  padding: 4px 6px;
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+  background: var(--superficie);
+}
+
+.tabla-citas-envoltura {
+  overflow-x: auto;
+}
+
+.tabla-citas {
+  width: 100%;
+  min-width: 920px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.tabla-citas th {
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tenue);
+  border-bottom: 1px solid var(--borde);
+  white-space: nowrap;
+}
+
+.tabla-citas td {
+  padding: 10px;
+  border-bottom: 1px solid var(--rejilla);
+  vertical-align: top;
+}
+
+.tabla-citas tbody tr:hover {
+  background: #f8f9fa;
+}
+
+.tabla-citas .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.numero-cita {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tabla-citas a {
+  color: var(--acento);
+}
+
+@media (max-width: 900px) {
+  .filtros-estado {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .filtros-estado {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

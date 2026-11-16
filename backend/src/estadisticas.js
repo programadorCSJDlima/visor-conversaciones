@@ -1,3 +1,4 @@
+import { leerConfirmacion, PATRON_CONFIRMACION } from './confirmaciones.js';
 import { pool } from './db.js';
 
 // Periodos que ofrece el panel (días; 0 = todo el historial)
@@ -17,21 +18,17 @@ const TIPO_RESPUESTA = {
   flow_reply: 'Formulario',
 };
 
-// El bot confirma cada cita con un texto fijo ("Tu cita quedó registrada" + N°, especialidad, médico, precio)
-const campo = (texto, re) => texto.match(re)?.[1]?.replace(/\*/g, '').trim() || null;
-
 function leerConfirmaciones(filas) {
   const citas = new Map();
   for (const { telefono, texto, creado_en } of filas) {
-    const numero = campo(texto, /N[°º]\s*de\s*cita:?\**\s*(\d+)/i);
-    if (!numero || citas.has(numero)) continue;
-    const precio = campo(texto, /Precio:?\**\s*S\/\s*([\d.,]+)/i);
-    citas.set(numero, {
+    const cita = leerConfirmacion(texto);
+    if (!cita || citas.has(cita.numero)) continue;
+    citas.set(cita.numero, {
       telefono,
       creadoEn: creado_en,
-      especialidad: campo(texto, /Especialidad:?\**\s*([^\n]+)/i) ?? 'Sin dato',
-      medico: campo(texto, /M[ée]dico:?\**\s*([^\n]+)/i) ?? 'Sin dato',
-      precio: precio ? Number(precio.replace(',', '')) : 0,
+      especialidad: cita.especialidad ?? 'Sin dato',
+      medico: cita.medico ?? 'Sin dato',
+      precio: cita.precio ?? 0,
     });
   }
   return [...citas.values()];
@@ -40,9 +37,9 @@ function leerConfirmaciones(filas) {
 async function citasRegistradas(desde, hasta) {
   const { rows } = await pool.query(
     `select telefono, texto, creado_en from chatbot_mensajes
-     where direccion = 'OUT' and texto ilike '%cita quedó registrada%'
+     where direccion = 'OUT' and texto ilike $3
        and creado_en >= $1 and creado_en <= $2`,
-    [desde, hasta],
+    [desde, hasta, PATRON_CONFIRMACION],
   );
   return leerConfirmaciones(rows);
 }
