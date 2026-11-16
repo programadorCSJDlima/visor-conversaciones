@@ -124,9 +124,37 @@ function EnLolimsa({ lolimsa, fecha }) {
   );
 }
 
+// WhatsApp desde el que agendó; si WhatsApp lo oculta, el registrado en Lolimsa
+function Telefono({ paciente }) {
+  if (paciente.telefono) {
+    return (
+      <>
+        <div className="telefono">{fmtTelefono(paciente.telefono)}</div>
+        <div className="tenue chico">WhatsApp</div>
+      </>
+    );
+  }
+  if (paciente.telefonoRegistrado) {
+    return (
+      <>
+        <div className="telefono">{paciente.telefonoRegistrado}</div>
+        <div className="tenue chico" title="WhatsApp oculta el número de este usuario">
+          Registrado en Lolimsa
+        </div>
+      </>
+    );
+  }
+  return (
+    <span className="tenue" title="WhatsApp oculta el número y no hay uno registrado en Lolimsa">
+      No disponible
+    </span>
+  );
+}
+
 function descargarCsv(citas) {
   const columnas = [
-    'Estado', 'N° cita', 'Agendada', 'Paciente', 'Tipo doc.', 'Documento', 'Historia', 'Especialidad', 'Médico',
+    'Estado', 'N° cita', 'Agendada', 'Paciente', 'Tipo doc.', 'Documento', 'Historia', 'Teléfono WhatsApp',
+    'Teléfono registrado (Lolimsa)', 'Especialidad', 'Médico',
     'Fecha cita', 'Hora', 'Consultorio', 'Precio', 'Pago con link', 'Pagado el', 'En Lolimsa', 'Pagada en Lolimsa',
     'Atendida', 'Conversación',
   ];
@@ -138,6 +166,8 @@ function descargarCsv(citas) {
     c.paciente.tipoDocumento ?? '',
     c.paciente.documento ?? '',
     c.paciente.historia ?? '',
+    c.paciente.telefono ?? '',
+    c.paciente.telefonoRegistrado ?? '',
     titulo(c.cita.especialidad),
     titulo(c.cita.medico),
     c.cita.fecha ?? c.cita.fechaTexto ?? '',
@@ -164,6 +194,110 @@ function descargarCsv(citas) {
   URL.revokeObjectURL(url);
 }
 
+/* ---------- Orden por columna ---------- */
+
+const ORDEN_ESTADO = { PENDIENTE: 0, PAGADA: 1, ATENDIDA: 2, ANULADA: 3 };
+const ORDEN_PAGO = { PAGADA: 0, PENDIENTE: 1, REVISAR: 2, VENCIDA: 3, SIN_LINK: 4 };
+const ordenLolimsa = (l) => (!l.consultada ? 4 : !l.existe ? 3 : l.atendida ? 2 : l.pagada ? 1 : 0);
+
+// valor: lo que se compara al ordenar por esa columna (null va siempre al final)
+const COLUMNAS = [
+  { id: 'estado', nombre: 'Estado', valor: (c) => ORDEN_ESTADO[c.estado] },
+  { id: 'cita', nombre: 'Cita', ayuda: 'Ordenar por fecha en que se agendó', valor: (c) => c.agendadaEn },
+  { id: 'paciente', nombre: 'Paciente', valor: (c) => c.paciente.nombre?.toLowerCase() ?? null },
+  { id: 'telefono', nombre: 'Teléfono', valor: (c) => c.paciente.telefono ?? c.paciente.telefonoRegistrado ?? null },
+  {
+    id: 'atencion',
+    nombre: 'Atención',
+    ayuda: 'Ordenar por fecha de la cita',
+    valor: (c) => (c.cita.fecha ? `${c.cita.fecha}T${c.cita.hora ?? ''}` : null),
+  },
+  { id: 'precio', nombre: 'Precio', num: true, valor: (c) => c.cita.precio },
+  { id: 'pago', nombre: 'Pago con link', valor: (c) => ORDEN_PAGO[c.pago.estado] ?? 9 },
+  { id: 'lolimsa', nombre: 'En Lolimsa', valor: (c) => ordenLolimsa(c.lolimsa) },
+];
+
+function comparar(a, b) {
+  return typeof a === 'number' && typeof b === 'number' ? a - b : String(a).localeCompare(String(b), 'es');
+}
+
+function ordenar(lista, { columna, dir }) {
+  const { valor } = COLUMNAS.find((c) => c.id === columna);
+  const signo = dir === 'asc' ? 1 : -1;
+  return [...lista].sort((x, y) => {
+    const a = valor(x);
+    const b = valor(y);
+    if (a == null || b == null) return a == null ? (b == null ? 0 : 1) : -1;
+    return signo * comparar(a, b);
+  });
+}
+
+/* ---------- Paginado ---------- */
+
+const TAMANOS = [10, 25, 50, 100];
+const CLAVE_TAMANO = 'visor.citas.porPagina';
+
+function tamanoGuardado() {
+  try {
+    const guardado = localStorage.getItem(CLAVE_TAMANO);
+    if (guardado === null) return 10;
+    const n = Number(guardado);
+    return TAMANOS.includes(n) || n === 0 ? n : 10;
+  } catch {
+    return 10;
+  }
+}
+
+// Primera, última y las vecinas de la actual; "…" donde se saltan páginas
+function numerosDePagina(actual, total) {
+  const set = [...new Set([1, actual - 1, actual, actual + 1, total])].filter((p) => p >= 1 && p <= total).sort((a, b) => a - b);
+  return set.flatMap((p, i) => (i && p - set[i - 1] > 1 ? ['…', p] : [p]));
+}
+
+function Paginacion({ pagina, totalPaginas, total, porPagina, onPagina, onPorPagina }) {
+  const desde = porPagina ? (pagina - 1) * porPagina + 1 : 1;
+  const hasta = porPagina ? Math.min(pagina * porPagina, total) : total;
+  return (
+    <div className="paginacion">
+      <span className="tenue">
+        Mostrando {desde}–{hasta} de {total}
+      </span>
+      <label className="tenue">
+        Filas por página{' '}
+        <select value={porPagina} onChange={(e) => onPorPagina(Number(e.target.value))}>
+          {TAMANOS.map((n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
+          <option value={0}>Todas</option>
+        </select>
+      </label>
+      {totalPaginas > 1 && (
+        <nav className="paginas" aria-label="Páginas">
+          <button onClick={() => onPagina(pagina - 1)} disabled={pagina === 1} aria-label="Página anterior">
+            ‹
+          </button>
+          {numerosDePagina(pagina, totalPaginas).map((p, i) =>
+            p === '…' ? (
+              <span key={`s${i}`} className="tenue">
+                …
+              </span>
+            ) : (
+              <button key={p} onClick={() => onPagina(p)} aria-current={p === pagina ? 'page' : undefined}>
+                {p}
+              </button>
+            ),
+          )}
+          <button onClick={() => onPagina(pagina + 1)} disabled={pagina === totalPaginas} aria-label="Página siguiente">
+            ›
+          </button>
+        </nav>
+      )}
+    </div>
+  );
+}
+
 export default function Citas() {
   const [dias, setDias] = useState(30);
   const [datos, setDatos] = useState(null);
@@ -171,7 +305,10 @@ export default function Citas() {
   const [error, setError] = useState(null);
   const [filtro, setFiltro] = useState('PENDIENTE');
   const [busqueda, setBusqueda] = useState('');
-  const [orden, setOrden] = useState('agendada');
+  const [orden, setOrden] = useState({ columna: 'cita', dir: 'desc' });
+  const [pagina, setPagina] = useState(1);
+  const [porPagina, setPorPagina] = useState(tamanoGuardado);
+  const tablaRef = useRef(null);
   const [recarga, setRecarga] = useState(0);
   // "Actualizar" pide a Lolimsa datos frescos; el refresco automático puede usar los de hace unos minutos
   const forzar = useRef(false);
@@ -221,16 +358,53 @@ export default function Citas() {
       (c) =>
         (filtro === 'TODAS' || c.estado === filtro) &&
         (!q ||
-          [c.numero, c.paciente.nombre, c.paciente.documento, c.paciente.historia, c.cita.especialidad, c.cita.medico]
+          [
+            c.numero,
+            c.paciente.nombre,
+            c.paciente.documento,
+            c.paciente.historia,
+            c.paciente.telefono,
+            c.paciente.telefonoRegistrado,
+            c.cita.especialidad,
+            c.cita.medico,
+          ]
             .filter(Boolean)
             .some((v) => String(v).toLowerCase().includes(q))),
     );
-    if (orden === 'fecha') {
-      const clave = (c) => (c.cita.fecha ? `${c.cita.fecha}T${c.cita.hora}` : '9999');
-      return [...lista].sort((a, b) => clave(a).localeCompare(clave(b)));
-    }
-    return lista;
+    return ordenar(lista, orden);
   }, [datos, filtro, busqueda, orden]);
+
+  // Al filtrar, buscar u ordenar se vuelve a la primera página
+  const filtrar = (k) => {
+    setFiltro(k);
+    setPagina(1);
+  };
+  const buscar = (texto) => {
+    setBusqueda(texto);
+    setPagina(1);
+  };
+  const ordenarPor = (columna) => {
+    setOrden((o) => ({ columna, dir: o.columna === columna && o.dir === 'asc' ? 'desc' : 'asc' }));
+    setPagina(1);
+  };
+  const cambiarTamano = (n) => {
+    setPorPagina(n);
+    setPagina(1);
+    try {
+      localStorage.setItem(CLAVE_TAMANO, String(n));
+    } catch {
+      // sin almacenamiento local se usa el tamaño por defecto la próxima vez
+    }
+  };
+  const irAPagina = (p) => {
+    setPagina(p);
+    tablaRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  };
+
+  // Si el refresco automático trae menos citas, la página actual no puede quedar fuera de rango
+  const totalPaginas = porPagina ? Math.max(1, Math.ceil(visibles.length / porPagina)) : 1;
+  const paginaActual = Math.min(pagina, totalPaginas);
+  const enPagina = porPagina ? visibles.slice((paginaActual - 1) * porPagina, paginaActual * porPagina) : visibles;
 
   const lol = datos?.lolimsa;
 
@@ -265,6 +439,13 @@ export default function Citas() {
         </p>
       )}
 
+      {!datos && cargando && !error && (
+        <div className="cargando-citas" role="status">
+          <span className="girador" aria-hidden="true" />
+          Consultando las citas en Lolimsa…
+        </div>
+      )}
+
       {datos && (
         <div className={`panel-cuerpo ${cargando ? 'recargando' : ''}`}>
           <section className="filtros-estado" aria-label="Filtrar por estado">
@@ -273,7 +454,7 @@ export default function Citas() {
                 key={k}
                 className={`filtro-estado ${k === 'TODAS' ? '' : ESTADOS[k].clase}`}
                 aria-pressed={filtro === k}
-                onClick={() => setFiltro(k)}
+                onClick={() => filtrar(k)}
               >
                 <span className="filtro-nombre">
                   {k !== 'TODAS' && <span aria-hidden="true">{ESTADOS[k].icono} </span>}
@@ -285,21 +466,14 @@ export default function Citas() {
             ))}
           </section>
 
-          <div className="tarjeta">
+          <div className="tarjeta" ref={tablaRef}>
             <div className="barra-herramientas">
               <input
                 type="search"
-                placeholder="Buscar paciente, documento, N° de cita, especialidad o médico…"
+                placeholder="Buscar paciente, documento, teléfono, N° de cita, especialidad o médico…"
                 value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
+                onChange={(e) => buscar(e.target.value)}
               />
-              <label className="tenue chico">
-                Ordenar por{' '}
-                <select value={orden} onChange={(e) => setOrden(e.target.value)}>
-                  <option value="agendada">Más recientes</option>
-                  <option value="fecha">Fecha de la cita</option>
-                </select>
-              </label>
               <button className="boton-chico" onClick={actualizar} disabled={cargando}>
                 {cargando ? 'Consultando…' : 'Actualizar'}
               </button>
@@ -315,17 +489,31 @@ export default function Citas() {
                 <table className="tabla-citas">
                   <thead>
                     <tr>
-                      <th>Estado</th>
-                      <th>Cita</th>
-                      <th>Paciente</th>
-                      <th>Atención</th>
-                      <th className="num">Precio</th>
-                      <th>Pago con link</th>
-                      <th>En Lolimsa</th>
+                      {COLUMNAS.map((col) => {
+                        const activa = orden.columna === col.id;
+                        return (
+                          <th
+                            key={col.id}
+                            className={col.num ? 'num' : ''}
+                            aria-sort={activa ? (orden.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                          >
+                            <button
+                              className="orden-columna"
+                              onClick={() => ordenarPor(col.id)}
+                              title={col.ayuda ?? `Ordenar por ${col.nombre.toLowerCase()}`}
+                            >
+                              {col.nombre}
+                              <span className="flecha" aria-hidden="true">
+                                {activa ? (orden.dir === 'asc' ? '▲' : '▼') : '▲▼'}
+                              </span>
+                            </button>
+                          </th>
+                        );
+                      })}
                     </tr>
                   </thead>
                   <tbody>
-                    {visibles.map((c) => (
+                    {enPagina.map((c) => (
                       <tr key={c.numero}>
                         <td>
                           <Insignia clase={ESTADOS[c.estado].clase} icono={ESTADOS[c.estado].icono}>
@@ -347,6 +535,9 @@ export default function Citas() {
                           </a>
                         </td>
                         <td>
+                          <Telefono paciente={c.paciente} />
+                        </td>
+                        <td>
                           <div>{titulo(c.cita.especialidad)}</div>
                           <div className="tenue chico">{titulo(c.cita.medico)}</div>
                           <div className="chico">
@@ -366,6 +557,17 @@ export default function Citas() {
                   </tbody>
                 </table>
               </div>
+            )}
+
+            {visibles.length > 0 && (
+              <Paginacion
+                pagina={paginaActual}
+                totalPaginas={totalPaginas}
+                total={visibles.length}
+                porPagina={porPagina}
+                onPagina={irAPagina}
+                onPorPagina={cambiarTamano}
+              />
             )}
           </div>
         </div>

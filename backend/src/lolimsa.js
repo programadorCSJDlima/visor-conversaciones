@@ -1,33 +1,48 @@
-// Estado de las citas en Lolimsa, consultado a través de api_csjd (la API del chatbot, que tiene
-// acceso a Oracle): GET /api/v1/citas?numeroDocumento=&desde= devuelve las citas del paciente con
-// sus marcas de atendida (citas.statte) y pagada en caja (citas.stapag_caj).
-// Una cita anulada en Lolimsa deja de existir en lolimsa.citas, así que ya no aparece en esa lista.
+// Datos de Lolimsa consultados a través de api_csjd (la API del chatbot, que tiene acceso a Oracle):
+// - GET /api/v1/citas?numeroDocumento=&desde= devuelve las citas del paciente con sus marcas de
+//   atendida (citas.statte) y pagada en caja (citas.stapag_caj). Una cita anulada en Lolimsa deja de
+//   existir en lolimsa.citas, así que ya no aparece en esa lista.
+// - GET /api/v1/pacientes/documento/{numero} devuelve la ficha del paciente (teléfono registrado, etc.).
 
 const URL_API = process.env.CSJD_API_URL?.replace(/\/+$/, '');
 export const lolimsaConfigurado = Boolean(URL_API);
 
-const VIGENCIA_MS = 2 * 60 * 1000;
+const VIGENCIA_CITAS_MS = 2 * 60 * 1000;
+const VIGENCIA_PACIENTES_MS = 10 * 60 * 1000;
 const PARALELAS = 4;
-const cache = new Map(); // "documento|desde" -> { hasta, promesa }
+const cache = new Map(); // ruta -> { hasta, promesa }
 
-function citasPorDocumento(documento, desde, fresco) {
+// GET a api_csjd guardando la respuesta en memoria; sinDatos es lo que vale un 404
+function pedir(ruta, { vigencia, fresco, sinDatos }) {
   const ahora = Date.now();
-  const clave = `${documento}|${desde}`;
-  const previo = cache.get(clave);
+  const previo = cache.get(ruta);
   if (!fresco && previo && previo.hasta > ahora) return previo.promesa;
 
   for (const [k, v] of cache) if (v.hasta <= ahora) cache.delete(k);
-  const url = `${URL_API}/api/v1/citas?${new URLSearchParams({ numeroDocumento: documento, desde })}`;
-  const promesa = fetch(url, { signal: AbortSignal.timeout(15000) }).then(async (r) => {
+  const promesa = fetch(`${URL_API}${ruta}`, { signal: AbortSignal.timeout(15000) }).then(async (r) => {
     const cuerpo = await r.json().catch(() => null);
-    // 404: no hay paciente con ese documento, así que tampoco citas
-    if (r.status === 404) return [];
+    if (r.status === 404) return sinDatos;
     if (!r.ok) throw new Error(cuerpo?.descripcion ?? `api_csjd respondió ${r.status}`);
-    return cuerpo?.data ?? [];
+    return cuerpo?.data ?? sinDatos;
   });
-  cache.set(clave, { hasta: ahora + VIGENCIA_MS, promesa });
-  promesa.catch(() => cache.delete(clave));
+  cache.set(ruta, { hasta: ahora + vigencia, promesa });
+  promesa.catch(() => cache.delete(ruta));
   return promesa;
+}
+
+function mensajeDeError(e) {
+  if (e.name === 'TimeoutError') return 'api_csjd no respondió a tiempo';
+  if (e.cause) return `No se pudo conectar con api_csjd (${e.cause.code ?? e.cause.message})`;
+  return e.message;
+}
+
+// Ejecuta fn sobre cada elemento, como máximo PARALELAS a la vez
+async function enParalelo(items, fn) {
+  let siguiente = 0;
+  const trabajar = async () => {
+    while (siguiente < items.length) await fn(items[siguiente++]);
+  };
+  await Promise.all(Array.from({ length: Math.min(PARALELAS, items.length) }, trabajar));
 }
 
 /**
@@ -37,20 +52,34 @@ function citasPorDocumento(documento, desde, fresco) {
  */
 export async function consultarDocumentos(consultas, { fresco = false } = {}) {
   const resultado = new Map();
-  let siguiente = 0;
-  const trabajar = async () => {
-    while (siguiente < consultas.length) {
-      const { documento, desde } = consultas[siguiente++];
-      try {
-        resultado.set(documento, { citas: await citasPorDocumento(documento, desde, fresco) });
-      } catch (e) {
-        let error = e.message;
-        if (e.name === 'TimeoutError') error = 'api_csjd no respondió a tiempo';
-        else if (e.cause) error = `No se pudo conectar con api_csjd (${e.cause.code ?? e.cause.message})`;
-        resultado.set(documento, { error });
-      }
+  await enParalelo(consultas, async ({ documento, desde }) => {
+    const ruta = `/api/v1/citas?${new URLSearchParams({ numeroDocumento: documento, desde })}`;
+    try {
+      resultado.set(documento, { citas: await pedir(ruta, { vigencia: VIGENCIA_CITAS_MS, fresco, sinDatos: [] }) });
+    } catch (e) {
+      resultado.set(documento, { error: mensajeDeError(e) });
     }
-  };
-  await Promise.all(Array.from({ length: Math.min(PARALELAS, consultas.length) }, trabajar));
+  });
+  return resultado;
+}
+
+/**
+ * Teléfono registrado en Lolimsa de cada documento. Si no se pudo consultar, el documento no aparece:
+ * es un dato complementario y no debe impedir mostrar las citas.
+ * @returns Map documento -> teléfono
+ */
+export async function telefonosRegistrados(documentos) {
+  const resultado = new Map();
+  await enParalelo(documentos, async (documento) => {
+    try {
+      const ruta = `/api/v1/pacientes/documento/${encodeURIComponent(documento)}`;
+      const paciente = await pedir(ruta, { vigencia: VIGENCIA_PACIENTES_MS, sinDatos: null });
+      // nuevo: el documento no está registrado en Lolimsa (los datos vienen de RENIEC)
+      const telefono = paciente && !paciente.nuevo ? paciente.telefono?.trim() : null;
+      if (telefono) resultado.set(documento, telefono);
+    } catch {
+      // sin teléfono registrado para este documento
+    }
+  });
   return resultado;
 }

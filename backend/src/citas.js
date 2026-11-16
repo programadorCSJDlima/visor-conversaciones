@@ -1,6 +1,6 @@
 import { leerConfirmacion, leerRevision, PATRON_CONFIRMACION, PATRON_REVISION } from './confirmaciones.js';
 import { pool } from './db.js';
-import { consultarDocumentos, lolimsaConfigurado } from './lolimsa.js';
+import { consultarDocumentos, lolimsaConfigurado, telefonosRegistrados } from './lolimsa.js';
 
 const ZONA = 'America/Lima';
 const fmtDia = new Intl.DateTimeFormat('en-CA', { timeZone: ZONA }); // yyyy-mm-dd
@@ -23,6 +23,16 @@ function documentosCandidatos(datos, mensajesEntrantes) {
 function elegirDocumento(candidatos, revision) {
   if (revision?.finDocumento) return candidatos.find((d) => d.endsWith(revision.finDocumento)) ?? null;
   return candidatos.length === 1 ? candidatos[0] : null;
+}
+
+// Algunos pacientes tienen en Lolimsa como teléfono el identificador de WhatsApp de la conversación
+// ("PE.1151…" guardado como 1151…), que no sirve para llamar: se descarta igual que cualquier valor
+// con una cantidad de dígitos que no corresponde a un teléfono.
+function telefonoUtil(valor, conversacion) {
+  const digitos = valor?.replace(/\D/g, '') ?? '';
+  if (digitos.length < 6 || digitos.length > 12) return null;
+  if (digitos === conversacion.replace(/\D/g, '')) return null;
+  return valor.trim();
 }
 
 function nombreCompleto(paciente) {
@@ -117,6 +127,10 @@ export async function citasAgendadas(dias, { fresco = false } = {}) {
       tipoDocumento: revision?.tipoDocumento ?? datos?.tipo_documento ?? null,
       documento,
       historia: datos?.paciente?.numeroDocumento === documento ? datos.paciente.historia : null,
+      // Número de WhatsApp desde el que se agendó (los usuarios "PE.…" tienen el número oculto por WhatsApp)
+      telefono: /^\d{6,15}$/.test(c.telefono) ? c.telefono : null,
+      telefonoRegistrado:
+        datos?.paciente?.numeroDocumento === documento ? telefonoUtil(datos.paciente.telefono, c.telefono) : null,
     };
   }
 
@@ -128,9 +142,20 @@ export async function citasAgendadas(dias, { fresco = false } = {}) {
     const previo = desdePorDoc.get(c.paciente.documento);
     if (!previo || dia < previo) desdePorDoc.set(c.paciente.documento, dia);
   }
-  const respuestas = lolimsaConfigurado
-    ? await consultarDocumentos([...desdePorDoc].map(([documento, desde]) => ({ documento, desde })), { fresco })
-    : new Map();
+  // Sin número de WhatsApp ni teléfono en la conversación, se busca el registrado en Lolimsa
+  const sinTelefono = [
+    ...new Set(
+      citas
+        .filter((c) => !c.paciente.telefono && !c.paciente.telefonoRegistrado && c.paciente.documento)
+        .map((c) => c.paciente.documento),
+    ),
+  ];
+  const [respuestas, registrados] = lolimsaConfigurado
+    ? await Promise.all([
+        consultarDocumentos([...desdePorDoc].map(([documento, desde]) => ({ documento, desde })), { fresco }),
+        telefonosRegistrados(sinTelefono),
+      ])
+    : [new Map(), new Map()];
 
   const filas = citas.map((c) => {
     const respuesta = respuestas.get(c.paciente.documento);
@@ -159,7 +184,12 @@ export async function citasAgendadas(dias, { fresco = false } = {}) {
       numero: c.datos.numero,
       agendadaEn: c.creado_en,
       telefono: c.telefono,
-      paciente: { ...c.paciente, historia: lolimsa.historia ?? c.paciente.historia },
+      paciente: {
+        ...c.paciente,
+        historia: lolimsa.historia ?? c.paciente.historia,
+        telefonoRegistrado:
+          c.paciente.telefonoRegistrado ?? telefonoUtil(registrados.get(c.paciente.documento), c.telefono),
+      },
       cita: {
         especialidad: lolimsa.servicio ?? c.datos.especialidad,
         medico: lolimsa.medico ?? c.datos.medico,

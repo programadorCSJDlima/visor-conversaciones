@@ -61,6 +61,40 @@
   color: var(--neutro-texto);
 }
 
+/* Primera carga: Lolimsa puede tardar unos segundos con muchos pacientes */
+.cargando-citas {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 48px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--borde);
+  background: var(--superficie);
+  color: var(--tenue);
+}
+
+.girador {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--borde);
+  border-top-color: var(--acento);
+  animation: girar 0.8s linear infinite;
+}
+
+@keyframes girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .girador {
+    animation-duration: 2.5s;
+  }
+}
+
 /* ---------- Filtros por estado ---------- */
 
 .filtros-estado {
@@ -158,7 +192,7 @@
 
 .tabla-citas {
   width: 100%;
-  min-width: 920px;
+  min-width: 1040px;
   border-collapse: collapse;
   font-size: 13px;
 }
@@ -171,6 +205,41 @@
   color: var(--tenue);
   border-bottom: 1px solid var(--borde);
   white-space: nowrap;
+}
+
+/* Encabezados que ordenan: la flecha se resalta en la columna activa */
+.orden-columna {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  white-space: nowrap;
+}
+
+.orden-columna:hover {
+  color: var(--texto);
+}
+
+.flecha {
+  font-size: 8px;
+  letter-spacing: -1px;
+  opacity: 0.4;
+}
+
+.tabla-citas th[aria-sort='ascending'] .orden-columna,
+.tabla-citas th[aria-sort='descending'] .orden-columna {
+  color: var(--texto);
+}
+
+.tabla-citas th[aria-sort='ascending'] .flecha,
+.tabla-citas th[aria-sort='descending'] .flecha {
+  font-size: 10px;
+  opacity: 1;
+  color: var(--acento);
 }
 
 .tabla-citas td {
@@ -199,6 +268,58 @@
   color: var(--acento);
 }
 
+/* ---------- Paginado ---------- */
+
+.paginacion {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  margin-top: 14px;
+  font-size: 13px;
+}
+
+.paginacion select {
+  font: inherit;
+  padding: 3px 6px;
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+  background: var(--superficie);
+}
+
+.paginas {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.paginas button {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+  background: var(--superficie);
+  font-variant-numeric: tabular-nums;
+}
+
+.paginas button:hover:not(:disabled) {
+  background: var(--fondo);
+}
+
+.paginas button[aria-current='page'] {
+  background: var(--acento);
+  border-color: var(--acento);
+  color: #fff;
+  font-weight: 600;
+}
+
+.paginas button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 @media (max-width: 900px) {
   .filtros-estado {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -209,4 +330,9 @@
   .filtros-estado {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+.telefono {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
