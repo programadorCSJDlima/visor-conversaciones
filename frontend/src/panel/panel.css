@@ -12,11 +12,50 @@
   --texto-bueno: #006300;
   --texto-malo: #d03b3b;
   --estado-bueno: #0ca30c;
+  /* Mapa de calor: de poco a mucho */
+  --calor-1: #b7d3f6;
+  --calor-2: #86b6ef;
+  --calor-3: #5598e7;
+  --calor-4: #2a78d6;
+  --calor-5: #1c5cab;
+  --calor-6: #104281;
+  /* Embudo: de la primera etapa a la última */
+  --embudo-1: #104281;
+  --embudo-2: #1c5cab;
+  --embudo-3: #2a78d6;
+  --embudo-4: #5598e7;
+  --embudo-5: #86b6ef;
 
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   padding: 20px 24px 32px;
+}
+
+/* Modo noche: pasos validados contra la superficie oscura (lo más intenso es lo más claro) */
+:root[data-theme='dark'] .panel {
+  --serie-1: #3987e5;
+  --serie-2: #d95926;
+  --serie-3: #199e70;
+  --serie-4: #c98500;
+  --otro: #6b6a64;
+  --calor-vacio: #232b31;
+  --medidor-pista: #1c3350;
+  --rejilla: #29323a;
+  --eje: #3b454d;
+  --texto-bueno: #0ca30c;
+  --texto-malo: #e66767;
+  --calor-1: #1c3a5e;
+  --calor-2: #1c4f8a;
+  --calor-3: #256abf;
+  --calor-4: #3987e5;
+  --calor-5: #6da7ec;
+  --calor-6: #b7d3f6;
+  --embudo-1: #b7d3f6;
+  --embudo-2: #86b6ef;
+  --embudo-3: #5598e7;
+  --embudo-4: #2a78d6;
+  --embudo-5: #1c5cab;
 }
 
 .panel-cabecera {
@@ -40,7 +79,7 @@
   display: inline-flex;
   padding: 3px;
   border-radius: 8px;
-  background: #e4e6e9;
+  background: var(--segmentado-fondo);
 }
 
 .periodos button {
@@ -61,6 +100,228 @@
   color: var(--texto);
   font-weight: 600;
   box-shadow: 0 1px 2px rgb(0 0 0 / 10%);
+}
+
+/* ---------- Rango de fechas personalizado ---------- */
+
+.filtro-periodo {
+  position: relative;
+}
+
+.filtro-periodo .periodos {
+  flex-wrap: wrap;
+}
+
+.boton-rango {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.periodos .boton-rango[aria-pressed='true'] {
+  color: var(--acento);
+}
+
+.selector-fechas {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: 148px auto;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px var(--sombra);
+  font-size: 13px;
+}
+
+.selector-rapidos {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 8px;
+  border-right: 1px solid var(--borde);
+}
+
+.selector-rapidos button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.selector-rapidos button:hover {
+  background: var(--fondo);
+}
+
+/* El rango elegido se marca con un check en negrita */
+.selector-rapidos button::before {
+  content: '';
+  width: 14px;
+  font-weight: 700;
+  color: var(--acento);
+}
+
+.selector-rapidos button[aria-pressed='true'] {
+  font-weight: 600;
+}
+
+.selector-rapidos button[aria-pressed='true']::before {
+  content: '✓';
+}
+
+.selector-calendarios {
+  position: relative;
+  display: flex;
+  gap: 24px;
+  padding: 14px 16px 8px;
+}
+
+.calendario-nav {
+  position: absolute;
+  top: 12px;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--tenue);
+}
+
+.calendario-nav:hover:not(:disabled) {
+  background: var(--fondo);
+  color: var(--texto);
+}
+
+.calendario-nav:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.calendario-nav.anterior {
+  left: 12px;
+}
+
+.calendario-nav.siguiente {
+  right: 12px;
+}
+
+.calendario-mes {
+  width: 252px;
+}
+
+.calendario-titulo {
+  height: 30px;
+  line-height: 30px;
+  margin-bottom: 4px;
+  text-align: center;
+  font-weight: 600;
+}
+
+/* Sin espacio horizontal entre días para que el rango se vea como una franja continua */
+.calendario-grilla {
+  display: grid;
+  grid-template-columns: repeat(7, 36px);
+  grid-auto-rows: 34px;
+  row-gap: 2px;
+}
+
+.calendario-dia-semana {
+  align-self: center;
+  text-align: center;
+  font-size: 11px;
+  color: var(--tenue);
+}
+
+.calendario-dia {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.calendario-dia:hover:not(:disabled):not(.extremo) {
+  background: var(--fondo);
+  border-radius: 8px;
+}
+
+.calendario-dia.hoy:not(.extremo) {
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px var(--acento);
+}
+
+.calendario-dia.dentro {
+  background: var(--acento-suave);
+}
+
+.calendario-dia.dentro:hover:not(:disabled) {
+  border-radius: 0;
+  background: var(--acento-suave);
+  filter: brightness(0.95);
+}
+
+.calendario-dia.extremo {
+  border-radius: 8px;
+  background: var(--acento);
+  color: #fff;
+  font-weight: 600;
+}
+
+.calendario-dia.extremo.inicio {
+  border-radius: 8px 0 0 8px;
+}
+
+.calendario-dia.extremo.fin {
+  border-radius: 0 8px 8px 0;
+}
+
+.calendario-dia:disabled {
+  color: var(--deshabilitado);
+  cursor: default;
+}
+
+.selector-pie {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--borde);
+}
+
+.selector-error {
+  color: var(--texto-malo);
+}
+
+.selector-acciones {
+  display: flex;
+  gap: 8px;
+}
+
+.boton-primario {
+  padding: 5px 14px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--acento);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.boton-primario:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 .panel-cuerpo {
@@ -274,8 +535,8 @@ line.cursor {
   padding: 8px 10px;
   border-radius: 8px;
   background: var(--superficie);
-  border: 1px solid rgb(11 11 11 / 10%);
-  box-shadow: 0 4px 14px rgb(0 0 0 / 12%);
+  border: 1px solid var(--borde);
+  box-shadow: 0 4px 14px var(--sombra);
   font-size: 12px;
   white-space: nowrap;
 }
@@ -590,6 +851,31 @@ line.cursor {
 
   .indicadores {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* En celular: un solo mes y los rangos rápidos en una fila desplazable */
+  .selector-fechas {
+    position: fixed;
+    top: auto;
+    right: 8px;
+    bottom: 8px;
+    left: 8px;
+    grid-template-columns: 1fr;
+  }
+
+  .selector-rapidos {
+    flex-direction: row;
+    overflow-x: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--borde);
+  }
+
+  .selector-calendarios {
+    justify-content: center;
+  }
+
+  .selector-calendarios .mes-izquierdo {
+    display: none;
   }
 
   .indicador-valor {

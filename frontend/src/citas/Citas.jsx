@@ -28,6 +28,13 @@ const fmtFechaCita = new Intl.DateTimeFormat('es-PE', { timeZone: 'UTC', weekday
 const fmtHoraLima = new Intl.DateTimeFormat('es-PE', { timeZone: 'America/Lima', hour: 'numeric', minute: '2-digit' });
 const fmtDiaMes = new Intl.DateTimeFormat('es-PE', { timeZone: 'America/Lima', day: 'numeric', month: 'short' });
 const momento = (f) => `${fmtDiaMes.format(new Date(f)).replace('.', '')}, ${fmtHoraLima.format(new Date(f))}`;
+// Fecha y hora de Lima sin zona horaria (como las devuelve api_csjd): se muestran tal cual
+const fmtDiaMesSinZona = new Intl.DateTimeFormat('es-PE', { timeZone: 'UTC', day: 'numeric', month: 'short' });
+const fmtHoraSinZona = new Intl.DateTimeFormat('es-PE', { timeZone: 'UTC', hour: 'numeric', minute: '2-digit' });
+const momentoLocal = (f) => {
+  const d = new Date(`${f}Z`);
+  return `${fmtDiaMesSinZona.format(d).replace('.', '')}, ${fmtHoraSinZona.format(d)}`;
+};
 const hoyLima = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date());
 
 // "ORTOPEDIA-TRAUMATOLOGIA" -> "Ortopedia-Traumatologia"
@@ -92,10 +99,25 @@ function EnLolimsa({ lolimsa, fecha }) {
     );
   }
   if (!lolimsa.existe) {
+    const a = lolimsa.anulacion;
     return (
-      <Insignia clase="critico" icono="✕" title="La cita ya no figura en Lolimsa">
-        Anulada
-      </Insignia>
+      <>
+        <Insignia clase="critico" icono="✕" title="La cita ya no figura en Lolimsa">
+          Anulada
+        </Insignia>
+        {a && (
+          <div className="anulacion chico" title={a.ip ? `IP ${a.ip}` : undefined}>
+            <div>
+              por {a.nombre ? titulo(a.nombre) : a.usuario}
+              {a.nombre && <span className="tenue"> ({a.usuario})</span>}
+            </div>
+            <div className="tenue">
+              {a.fecha && momentoLocal(a.fecha)}
+              {a.equipo && ` · ${a.equipo}`}
+            </div>
+          </div>
+        )}
+      </>
     );
   }
   const yaPaso = fecha && fecha < hoyLima();
@@ -157,7 +179,7 @@ function descargarCsv(citas) {
     'Estado', 'N° cita', 'Agendada', 'Paciente', 'Tipo doc.', 'Documento', 'Historia', 'Teléfono WhatsApp',
     'Teléfono registrado (Lolimsa)', 'Especialidad', 'Médico',
     'Fecha cita', 'Hora', 'Consultorio', 'Precio', 'Pago con link', 'Pagado el', 'En Lolimsa', 'Pagada en Lolimsa',
-    'Atendida', 'Conversación',
+    'Atendida', 'Anulada por', 'Usuario Lolimsa', 'Fecha de anulación', 'Equipo de anulación', 'Conversación',
   ];
   const filas = citas.map((c) => [
     ESTADOS[c.estado].nombre,
@@ -180,6 +202,10 @@ function descargarCsv(citas) {
     !c.lolimsa.consultada ? 'Sin consultar' : c.lolimsa.existe ? 'Sí' : 'No (anulada)',
     c.lolimsa.existe ? (c.lolimsa.pagada ? 'Sí' : 'No') : '',
     c.lolimsa.existe ? (c.lolimsa.atendida ? 'Sí' : 'No') : '',
+    c.lolimsa.anulacion?.nombre ?? '',
+    c.lolimsa.anulacion?.usuario ?? '',
+    c.lolimsa.anulacion?.fecha?.replace('T', ' ') ?? '',
+    c.lolimsa.anulacion?.equipo ?? '',
     c.telefono,
   ]);
   const celda = (v) => {
@@ -343,9 +369,10 @@ export default function Citas() {
   }, []);
 
   const resumen = useMemo(() => {
-    const r = Object.fromEntries(['TODAS', ...FILTROS].map((k) => [k, { n: 0, monto: 0 }]));
+    const r = Object.fromEntries(['VIGENTES', ...FILTROS].map((k) => [k, { n: 0, monto: 0 }]));
     for (const c of datos?.citas ?? []) {
-      for (const k of ['TODAS', c.estado]) {
+      // Las anuladas no suman al total: solo se cuentan en su propio filtro
+      for (const k of c.estado === 'ANULADA' ? [c.estado] : ['VIGENTES', c.estado]) {
         r[k].n += 1;
         r[k].monto += c.cita.precio ?? 0;
       }
@@ -370,7 +397,7 @@ export default function Citas() {
     const q = busqueda.trim().toLowerCase();
     const lista = (datos?.citas ?? []).filter(
       (c) =>
-        (filtro === 'TODAS' || c.estado === filtro) &&
+        (filtro === 'VIGENTES' ? c.estado !== 'ANULADA' : c.estado === filtro) &&
         (!q ||
           [
             c.numero,
@@ -381,6 +408,8 @@ export default function Citas() {
             c.paciente.telefonoRegistrado,
             c.cita.especialidad,
             c.cita.medico,
+            c.lolimsa.anulacion?.nombre,
+            c.lolimsa.anulacion?.usuario,
           ]
             .filter(Boolean)
             .some((v) => String(v).toLowerCase().includes(q))),
@@ -463,16 +492,17 @@ export default function Citas() {
       {datos && (
         <div className={`panel-cuerpo ${cargando ? 'recargando' : ''}`}>
           <section className="filtros-estado" aria-label="Filtrar por estado">
-            {['TODAS', ...FILTROS].map((k) => (
+            {['VIGENTES', ...FILTROS].map((k) => (
               <button
                 key={k}
-                className={`filtro-estado ${k === 'TODAS' ? '' : ESTADOS[k].clase}`}
+                className={`filtro-estado ${k === 'VIGENTES' ? '' : ESTADOS[k].clase}`}
                 aria-pressed={filtro === k}
                 onClick={() => filtrar(k)}
+                title={k === 'VIGENTES' ? 'Todas las citas menos las anuladas' : undefined}
               >
                 <span className="filtro-nombre">
-                  {k !== 'TODAS' && <span aria-hidden="true">{ESTADOS[k].icono} </span>}
-                  {k === 'TODAS' ? 'Todas' : ESTADOS[k].nombre}
+                  {k !== 'VIGENTES' && <span aria-hidden="true">{ESTADOS[k].icono} </span>}
+                  {k === 'VIGENTES' ? 'Vigentes' : ESTADOS[k].nombre}
                 </span>
                 <span className="filtro-n">{resumen[k].n}</span>
                 <span className="tenue chico">{soles.format(resumen[k].monto)}</span>

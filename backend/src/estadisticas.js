@@ -122,25 +122,40 @@ function contar(items, clave, limite) {
     .slice(0, limite);
 }
 
-export async function estadisticas(dias) {
-  // Hoy se agrupa por hora; el resto, por día (siempre en hora de Lima)
-  const tramo = dias === 1 ? 'hour' : 'day';
+// Rango personalizado más largo que se acepta (para periodos mayores está "Todo")
+export const MAX_DIAS_RANGO = 366;
+
+/**
+ * Periodo: { dias } (últimos N días hasta ahora; 0 = todo el historial) o { desde, hasta } (fechas yyyy-mm-dd
+ * de Lima, ambas incluidas). Se compara con el mismo número de días inmediatamente anteriores.
+ */
+export async function estadisticas({ dias = 0, desde: desdeDia = null, hasta: hastaDia = null }) {
   const { rows: [r] } = await pool.query(
-    `with base as (
-       select now() as ahora,
-              case when $1::int > 0
-                then (date_trunc('day', now() at time zone '${ZONA}') - make_interval(days => $1::int - 1)) at time zone '${ZONA}'
-              end as desde
+    `with hoy as (select (now() at time zone '${ZONA}')::date as d),
+     dias as (
+       select coalesce($1::date, case when $3::int > 0 then (select d from hoy) - ($3::int - 1) end) as desde_dia,
+              coalesce($2::date, (select d from hoy)) as hasta_dia
+     ),
+     limites as (
+       select desde_dia, hasta_dia,
+              hasta_dia - desde_dia + 1 as n_dias,
+              desde_dia::timestamp at time zone '${ZONA}' as desde,
+              -- Hasta el final del último día, o ahora si ese día es hoy
+              least(((hasta_dia + 1)::timestamp at time zone '${ZONA}') - interval '1 microsecond', now()) as hasta
+       from dias
      )
-     select ahora as hasta, desde,
-            desde - make_interval(days => $1::int) as desde_previo,
-            ahora - make_interval(days => $1::int) as hasta_previo,
-            coalesce(desde, (select min(creado_en) from chatbot_mensajes), ahora) as inicio_serie
-     from base`,
-    [dias],
+     select to_char(desde_dia, 'YYYY-MM-DD') as desde_dia, to_char(hasta_dia, 'YYYY-MM-DD') as hasta_dia, n_dias,
+            desde, hasta,
+            desde - make_interval(days => n_dias) as desde_previo,
+            hasta - make_interval(days => n_dias) as hasta_previo,
+            coalesce(desde, (select min(creado_en) from chatbot_mensajes), now()) as inicio_serie
+     from limites`,
+    [desdeDia, hastaDia, dias],
   );
   const desde = r.desde ?? new Date(0);
   const { hasta } = r;
+  // Un solo día se agrupa por hora; el resto, por día (siempre en hora de Lima)
+  const tramo = r.n_dias === 1 ? 'hour' : 'day';
 
   const [actual, previo, serie, citas, embudo, respuestas, calor, botones, estados, errores] = await Promise.all([
     kpis(desde, hasta),
@@ -231,7 +246,15 @@ export async function estadisticas(dias) {
 
   const e = embudo.rows[0];
   return {
-    periodo: { dias, tramo, desde: r.desde, hasta },
+    periodo: {
+      dias: desdeDia ? null : dias,
+      desdeDia: r.desde_dia,
+      hastaDia: r.hasta_dia,
+      nDias: r.n_dias,
+      tramo,
+      desde: r.desde,
+      hasta,
+    },
     kpis: actual,
     previo,
     serie: serie.rows.map((s) => ({ ...s, citas: citasEn[s.t] ?? 0 })),

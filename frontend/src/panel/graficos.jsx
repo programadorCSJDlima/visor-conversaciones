@@ -318,7 +318,8 @@ export function BarraApilada({ segmentos, unidad }) {
 
 const DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 const DIAS_LARGOS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
-export const ESCALA_CALOR = ['#b7d3f6', '#86b6ef', '#5598e7', '#2a78d6', '#1c5cab', '#104281'];
+// Colores en panel.css (cambian con el modo día/noche)
+export const ESCALA_CALOR = [1, 2, 3, 4, 5, 6].map((n) => `var(--calor-${n})`);
 
 export function MapaCalor({ celdas, unidad }) {
   const { ref, mostrar, ocultar, elemento } = useTooltip();

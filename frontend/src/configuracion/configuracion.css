@@ -1,0 +1,360 @@
+.configuracion-secciones {
+  display: grid;
+  gap: 12px;
+  max-width: 1040px;
+}
+
+.configuracion-secciones code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--fondo);
+  font-size: 12px;
+}
+
+.conteo-usuarios {
+  flex-shrink: 0;
+  padding: 2px 10px;
+  border-radius: 10px;
+  background: var(--fondo);
+  border: 1px solid var(--borde);
+  color: var(--tenue);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.oculto-visual {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.bloque {
+  display: block;
+}
+
+/* ---------- Avisos ---------- */
+
+.aviso-config {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.aviso-config.ok {
+  background: var(--ok-suave);
+  color: var(--ok);
+}
+
+.aviso-config.error {
+  background: var(--error-suave);
+  color: var(--error);
+}
+
+.aviso-config.aviso {
+  background: var(--aviso-suave);
+  color: var(--aviso);
+}
+
+/* ---------- Controles ---------- */
+
+.configuracion-secciones select {
+  padding: 4px 6px;
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+  background: var(--superficie);
+  color: var(--texto);
+  font: inherit;
+  font-size: 13px;
+}
+
+.configuracion-secciones select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.boton-primario {
+  padding: 5px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--acento);
+  /* superficie: blanco en modo día y casi negro en modo noche (el acento nocturno es claro) */
+  color: var(--superficie);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.boton-primario:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.boton-primario:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.boton-chico.peligro {
+  border-color: var(--error);
+  color: var(--error);
+}
+
+.boton-chico.peligro:hover:not(:disabled) {
+  background: var(--error-suave);
+}
+
+.boton-chico:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* Switch de acceso: pista verde cuando está activo, siempre con el texto al lado */
+.switch-acceso {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: var(--texto);
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.switch-acceso-pista {
+  position: relative;
+  width: 34px;
+  height: 20px;
+  border-radius: 10px;
+  background: var(--deshabilitado);
+  transition: background 0.15s ease;
+  flex-shrink: 0;
+}
+
+.switch-acceso-perilla {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px var(--sombra);
+  transition: transform 0.15s ease;
+}
+
+.switch-acceso[aria-checked='true'] .switch-acceso-pista {
+  background: var(--ok);
+}
+
+.switch-acceso[aria-checked='true'] .switch-acceso-perilla {
+  transform: translateX(14px);
+}
+
+.switch-acceso:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.switch-acceso:focus-visible {
+  outline: 2px solid var(--acento);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switch-acceso-pista,
+  .switch-acceso-perilla {
+    transition: none;
+  }
+}
+
+/* ---------- Agregar usuario ---------- */
+
+.agregar-usuario {
+  margin-bottom: 14px;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--fondo);
+}
+
+.buscar-lolimsa {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.buscar-lolimsa input {
+  padding: 8px 12px;
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  background: var(--superficie);
+  color: var(--texto);
+  font: inherit;
+  font-weight: 400;
+}
+
+.buscar-lolimsa input:focus {
+  outline: 2px solid var(--acento);
+  outline-offset: -1px;
+}
+
+.estado-busqueda {
+  margin: 8px 0 0;
+}
+
+.agregar-usuario .aviso-config {
+  margin: 8px 0 0;
+}
+
+.resultados-lolimsa {
+  max-height: 300px;
+  margin: 8px 0 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  border-radius: 8px;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+}
+
+.resultados-lolimsa li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 8px 12px;
+}
+
+.resultados-lolimsa li + li {
+  border-top: 1px solid var(--borde);
+}
+
+.asignar-controles {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ---------- Tabla de usuarios ---------- */
+
+/* relative: el texto oculto "Acciones" (absolute) queda dentro del scroll y no ensancha la página */
+.tabla-usuarios-envoltura {
+  position: relative;
+  overflow-x: auto;
+}
+
+.tabla-usuarios {
+  width: 100%;
+  min-width: 780px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.tabla-usuarios th {
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tenue);
+  border-bottom: 1px solid var(--borde);
+  white-space: nowrap;
+}
+
+.tabla-usuarios td {
+  padding: 10px;
+  border-bottom: 1px solid var(--borde);
+  vertical-align: middle;
+}
+
+.tabla-usuarios tbody tr:hover {
+  background: var(--fila-hover);
+}
+
+.tabla-usuarios tr.inactivo .usuario-celda {
+  opacity: 0.6;
+}
+
+.usuario-celda {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.usuario-nombre {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.etiqueta-tu {
+  padding: 0 6px;
+  border-radius: 8px;
+  background: var(--acento-suave);
+  color: var(--acento);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.insignia-permanente {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--acento-suave);
+  color: var(--acento);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.tabla-usuarios .acciones {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.confirmar-quitar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--error);
+  font-weight: 600;
+}
+
+/* ---------- Sin acceso ---------- */
+
+.sin-acceso {
+  max-width: 420px;
+  margin: 60px auto;
+  text-align: center;
+}
+
+.sin-acceso h1 {
+  font-size: 20px;
+}
+
+.sin-acceso p {
+  margin: 8px 0 16px;
+}
+
+.sin-acceso .boton-chico {
+  display: inline-block;
+  text-decoration: none;
+}
+
+@media (max-width: 760px) {
+  .tarjeta-cabecera:has(.conteo-usuarios) {
+    flex-direction: column;
+  }
+}

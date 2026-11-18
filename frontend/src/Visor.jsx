@@ -8,7 +8,7 @@ const REFRESCO_LISTA_MS = 15000;
 // La conversación abierta vive en el hash (#/51999999999) para poder compartir el enlace
 const leerHash = () => {
   const valor = decodeURIComponent(location.hash.replace(/^#\/?/, ''));
-  return valor && valor !== 'panel' && valor !== 'citas' ? valor : null;
+  return valor && !['panel', 'citas', 'configuracion'].includes(valor) ? valor : null;
 };
 
 export default function Visor() {

@@ -14,6 +14,21 @@
   --neutro-texto: #556570;
 }
 
+:root[data-theme='dark'] .citas {
+  --bueno-fondo: #1b3324;
+  --bueno-texto: #81c995;
+  --aviso-fondo: #3a3013;
+  --aviso-texto: #f6cf6b;
+  --serio-fondo: #3a2516;
+  --serio-texto: #f4a46f;
+  --critico-fondo: #3a1f1d;
+  --critico-texto: #f28b82;
+  --info-fondo: #18324a;
+  --info-texto: #8ab4f8;
+  --neutro-fondo: #263038;
+  --neutro-texto: #a7b3bb;
+}
+
 .insignia {
   display: inline-flex;
   align-items: center;
@@ -258,7 +273,7 @@
 }
 
 .tabla-citas tbody tr:hover {
-  background: #f8f9fa;
+  background: var(--fila-hover);
 }
 
 .tabla-citas .num {
@@ -339,6 +354,11 @@
   .filtros-estado {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+.anulacion {
+  margin-top: 4px;
+  line-height: 1.35;
 }
 
 .telefono {

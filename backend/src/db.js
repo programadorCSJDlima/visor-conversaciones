@@ -11,12 +11,19 @@ function configDesdeUrl(url) {
   };
 }
 
-export const pool = new pg.Pool({
+const conexion = {
   ...configDesdeUrl(process.env.DB_URL),
   user: process.env.DB_USERNAME,
   password: process.env.DB_PASSWORD,
-  max: 5,
   connectionTimeoutMillis: 8000,
-  // El visor solo lee: cualquier INSERT/UPDATE/DELETE fallaría
+};
+
+export const pool = new pg.Pool({
+  ...conexion,
+  max: 5,
+  // El visor solo lee las tablas del chatbot: cualquier INSERT/UPDATE/DELETE fallaría
   options: '-c default_transaction_read_only=on',
 });
+
+// Única conexión con escritura: la usa solo usuarios.js para su tabla visor_usuarios
+export const poolUsuarios = new pg.Pool({ ...conexion, max: 2 });

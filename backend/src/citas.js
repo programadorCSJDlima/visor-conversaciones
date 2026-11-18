@@ -1,6 +1,6 @@
 import { leerConfirmacion, leerRevision, PATRON_CONFIRMACION, PATRON_REVISION } from './confirmaciones.js';
 import { pool } from './db.js';
-import { consultarDocumentos, lolimsaConfigurado, telefonosRegistrados } from './lolimsa.js';
+import { anulacionesDeCitas, consultarDocumentos, lolimsaConfigurado, telefonosRegistrados } from './lolimsa.js';
 
 const ZONA = 'America/Lima';
 const fmtDia = new Intl.DateTimeFormat('en-CA', { timeZone: ZONA }); // yyyy-mm-dd
@@ -206,6 +206,13 @@ export async function citasAgendadas(dias, { fresco = false } = {}) {
       estado: estadoFinal(pago, lolimsa),
     };
   });
+
+  // Quién anuló las que ya no están en Lolimsa
+  const anuladas = filas.filter((f) => f.estado === 'ANULADA');
+  if (anuladas.length) {
+    const anulaciones = await anulacionesDeCitas(anuladas.map((f) => f.numero));
+    for (const f of anuladas) f.lolimsa.anulacion = anulaciones.get(f.numero) ?? null;
+  }
 
   const consultadas = [...respuestas.values()];
   return {

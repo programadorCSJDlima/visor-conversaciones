@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { api } from '../api.js';
 
-export default function Login({ onIngresar }) {
+// aviso: por qué se cerró la sesión (vencida o acceso retirado), si estaba abierta
+export default function Login({ onIngresar, aviso }) {
   const [usuario, setUsuario] = useState('');
   const [clave, setClave] = useState('');
   const [error, setError] = useState(null);
@@ -21,14 +22,22 @@ export default function Login({ onIngresar }) {
     }
   };
 
+  const mensaje = error ?? aviso;
+
   return (
     <div className="login-fondo">
       <form className="login" onSubmit={enviar}>
         <h1>Conversaciones</h1>
-        <p className="tenue">Visor del chatbot Juanita</p>
+        <p className="tenue">Visor del chatbot Juanita. Ingresa con tu usuario y clave de Lolimsa.</p>
         <label>
-          Usuario
-          <input autoFocus autoComplete="username" value={usuario} onChange={(e) => setUsuario(e.target.value)} />
+          Usuario de Lolimsa
+          <input
+            autoFocus
+            autoComplete="username"
+            placeholder="Usuario o DNI"
+            value={usuario}
+            onChange={(e) => setUsuario(e.target.value)}
+          />
         </label>
         <label>
           Clave
@@ -39,9 +48,13 @@ export default function Login({ onIngresar }) {
             onChange={(e) => setClave(e.target.value)}
           />
         </label>
-        {error && <p className="login-error">{error}</p>}
+        {mensaje && (
+          <p className="login-error" role="alert">
+            {mensaje}
+          </p>
+        )}
         <button type="submit" disabled={enviando || !usuario.trim() || !clave}>
-          {enviando ? 'Ingresando…' : 'Ingresar'}
+          {enviando ? 'Validando en Lolimsa…' : 'Ingresar'}
         </button>
       </form>
     </div>

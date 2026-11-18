@@ -9,7 +9,8 @@ visor-conversaciones/
 ```
 
 El backend lee `chatbot_mensajes` y `chatbot_conversaciones` con una conexión de
-**solo lectura**: el visor no puede modificar nada en la base.
+**solo lectura**: el visor no puede modificar nada del chatbot. Lo único que escribe es su
+propia tabla `visor_usuarios` (quién tiene acceso al visor), con una conexión aparte.
 
 ## Backend
 
@@ -21,17 +22,54 @@ DB_URL=jdbc:postgresql://10.10.0.133:5432/juanita_db
 DB_USERNAME=...
 DB_PASSWORD=...
 PUERTO=3001
+CSJD_API_URL=http://10.10.0.133:8081
+USUARIOS_API_KEY=...   # la misma que en el .env de api_csjd
 ```
 
-Si el visor va a quedar accesible en la red, definir `VISOR_USUARIO` y `VISOR_CLAVE`
-(los mensajes incluyen datos de pacientes). Con eso la app muestra una pantalla de login:
+### Login con usuarios de Lolimsa
+
+Como en app-citas, cada persona entra con **su usuario (o DNI) y clave de Lolimsa**. El visor
+no ve ni guarda claves: se las pasa a `api_csjd` (`POST /api/v1/usuarios-lolimsa/validar`),
+que las compara con `lolimsa.usuarios` (solo usuarios activos). Además, el usuario tiene que
+tener **acceso asignado** en el engranaje; si no, el login responde "no tiene acceso al visor".
+
+Hay dos roles:
+
+| Rol | Puede |
+| --- | --- |
+| Administrador | Todo, más el engranaje: dar acceso, cambiar rol, desactivar y quitar usuarios |
+| Usuario | Conversaciones, Citas y Panel (sin engranaje) |
+
+`SOPORTETI` (se cambia con `VISOR_ADMIN`) es **administrador permanente**: siempre puede entrar
+y no se le puede quitar el acceso, desactivar ni bajar de rol. Un administrador tampoco puede
+cambiar su propio acceso.
+
+El rol se vuelve a leer en cada petición (con 15 s de memoria), así que quitar o desactivar a
+alguien lo saca del visor al instante aunque tenga la sesión abierta.
+
+Las asignaciones se guardan en la tabla `visor_usuarios` de juanita_db, que el backend crea
+al arrancar si no existe.
+
+Para que funcione, `USUARIOS_API_KEY` tiene que tener **el mismo valor** en `backend/.env` del
+visor y en el `.env` de api_csjd (un texto largo al azar, por ejemplo la salida de
+`node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"`).
+
+Opcional: `VISOR_USUARIO` y `VISOR_CLAVE` definen una **cuenta de respaldo** (normalmente
+`SOPORTETI`) para entrar si Lolimsa o api_csjd no responden. Tiene el rol que le corresponda,
+como cualquier usuario.
 
 - La sesión dura 12 horas y se guarda en una cookie `HttpOnly`.
 - Tras 5 intentos fallidos desde la misma IP, el login se bloquea 5 minutos.
 - Reiniciar el backend cierra las sesiones, salvo que se defina `VISOR_SECRETO`
   (cualquier texto largo y aleatorio) para firmarlas siempre con la misma clave.
 
-Sin `VISOR_USUARIO`/`VISOR_CLAVE` el visor abre directo, sin login (útil en desarrollo).
+Sin `USUARIOS_API_KEY` ni `VISOR_USUARIO`/`VISOR_CLAVE` el visor abre directo, sin login (útil en
+desarrollo).
+
+El encabezado tiene a la derecha un switch de modo día / noche (se recuerda en cada navegador;
+si no se eligió, sigue el modo del sistema), el usuario conectado y, solo para los
+administradores, el engranaje que abre la configuración (`#/configuracion`). El backend también
+lo exige: `/api/configuracion/*` responde 403 a los usuarios sin rol de administrador.
 
 ```
 cd backend
@@ -44,14 +82,20 @@ Endpoints:
 
 | Método | Ruta | Descripción |
 | --- | --- | --- |
-| POST | `/api/login` | `{ usuario, clave }` → crea la cookie de sesión |
+| POST | `/api/login` | `{ usuario, clave }` de Lolimsa → crea la cookie de sesión (403 si no tiene acceso asignado) |
 | POST | `/api/logout` | Cierra la sesión |
-| GET | `/api/sesion` | Usuario de la sesión actual (401 si no hay) |
+| GET | `/api/sesion` | Usuario, nombre y rol de la sesión actual (401 si no hay o si le quitaron el acceso) |
+| GET | `/api/configuracion/usuarios` | Usuarios con acceso al visor (solo administradores) |
+| GET | `/api/configuracion/usuarios/lolimsa?q=` | Busca usuarios activos de Lolimsa por login, DNI o nombre |
+| POST | `/api/configuracion/usuarios` | `{ usuario, rol }` da acceso (usuario = login o DNI de Lolimsa; rol `ADMIN` o `USUARIO`) |
+| PATCH | `/api/configuracion/usuarios/:usuario` | `{ rol?, activo? }` cambia el rol o desactiva |
+| DELETE | `/api/configuracion/usuarios/:usuario` | Quita el acceso |
 | GET | `/api/conversaciones?q=` | Conversaciones por teléfono, ordenadas por actividad |
 | GET | `/api/conversaciones/:telefono` | Estado del bot y datos del paciente |
 | GET | `/api/conversaciones/:telefono/mensajes?antes=&despues=` | Mensajes (paginados por id) |
 | GET | `/api/mensajes/:id` | Mensaje con su payload completo de WhatsApp |
 | GET | `/api/estadisticas?dias=1\|7\|30\|90\|0` | Todo lo que muestra el panel (0 = todo el historial) |
+| GET | `/api/estadisticas?desde=yyyy-mm-dd&hasta=yyyy-mm-dd` | Lo mismo para un rango de fechas de Lima, ambas incluidas (máximo 366 días) |
 | GET | `/api/citas?dias=…&fresco=1` | Citas agendadas por el bot con su pago y su estado en Lolimsa (`fresco=1` no usa la respuesta guardada de Lolimsa) |
 
 ## Frontend
@@ -83,8 +127,9 @@ de Docker y nginx le reenvía las llamadas `/api`.
 En el servidor:
 
 1. Copiar la carpeta `visor-conversaciones` (sin `node_modules` ni `dist`).
-2. Crear `backend/.env` a partir de `backend/.env.example` con los datos de la base.
-   Las credenciales se leen al arrancar; no quedan dentro de las imágenes.
+2. Crear `backend/.env` a partir de `backend/.env.example` con los datos de la base,
+   `CSJD_API_URL` y `USUARIOS_API_KEY`. Las credenciales se leen al arrancar; no quedan
+   dentro de las imágenes.
 3. Construir y levantar:
 
    ```
@@ -138,8 +183,9 @@ docker compose up -d
 
 ### Panel (`#/panel`)
 
-Estadísticas filtrables por periodo (hoy, 7, 30, 90 días o todo), comparadas con el
-periodo anterior y actualizadas cada minuto:
+Estadísticas filtrables por periodo (hoy, 7, 30, 90 días, todo o un rango personalizado de
+hasta 366 días elegido en el calendario), comparadas con el mismo número de días
+inmediatamente anteriores y actualizadas cada minuto:
 
 - **Indicadores:** conversaciones, citas registradas (y su valor), conversión a cita,
   recaudado en línea, tiempo de respuesta del bot (mediana y p95) y errores de envío.

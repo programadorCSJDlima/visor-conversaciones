@@ -2,11 +2,13 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
-import { requiereSesion, rutasAuth } from './auth.js';
+import { loginActivo, requiereSesion, rutasAuth } from './auth.js';
 import { citasAgendadas } from './citas.js';
+import { rutasConfiguracion } from './configuracion.js';
 import { pool } from './db.js';
-import { estadisticas, PERIODOS } from './estadisticas.js';
+import { estadisticas, MAX_DIAS_RANGO, PERIODOS } from './estadisticas.js';
 import { aMensaje } from './mensajes.js';
+import { lolimsaDisponible, prepararTabla } from './usuarios.js';
 
 const app = express();
 const PUERTO = Number(process.env.PUERTO || 3001);
@@ -23,14 +25,28 @@ app.get('/api/salud', async (req, res) => {
 
 app.use(rutasAuth);
 app.use('/api', requiereSesion);
+app.use(rutasConfiguracion);
 
 const comoLike = (q) => `%${q.replace(/[\\%_]/g, '\\$&')}%`;
 
-// ?dias=1|7|30|90|0 (0 = todo el historial)
+// yyyy-mm-dd que además sea una fecha real (descarta, p. ej., 2026-02-31)
+const esFecha = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s ?? '') && new Date(`${s}T00:00:00Z`).toISOString().startsWith(s);
+
+// ?dias=1|7|30|90|0 (0 = todo el historial) o ?desde=yyyy-mm-dd&hasta=yyyy-mm-dd (ambas incluidas)
 app.get('/api/estadisticas', async (req, res) => {
+  const { desde, hasta } = req.query;
+  if (desde || hasta) {
+    if (!esFecha(desde) || !esFecha(hasta) || desde > hasta) {
+      return res.status(400).json({ error: 'desde y hasta deben ser fechas yyyy-mm-dd, con desde <= hasta' });
+    }
+    if ((Date.parse(hasta) - Date.parse(desde)) / 864e5 + 1 > MAX_DIAS_RANGO) {
+      return res.status(400).json({ error: `El rango puede tener como máximo ${MAX_DIAS_RANGO} días` });
+    }
+    return res.json(await estadisticas({ desde, hasta }));
+  }
   const dias = Number(req.query.dias ?? 30);
   if (!PERIODOS.includes(dias)) return res.status(400).json({ error: `dias debe ser uno de: ${PERIODOS}` });
-  res.json(await estadisticas(dias));
+  res.json(await estadisticas({ dias }));
 });
 
 // Citas agendadas por el bot, con su pago por link y su estado en Lolimsa (mismos periodos que el panel)
@@ -145,12 +161,22 @@ if (process.env.FRONTEND_DIST) {
   app.get('/{*ruta}', (req, res) => res.sendFile(path.join(dist, 'index.html')));
 }
 
+// Los ErrorVisor (usuarios.js) y los errores de express.json traen su propio status
 app.use((err, req, res, next) => {
-  console.error(err);
-  res.status(500).json({ error: err.message });
+  const status = err.status ?? 500;
+  if (status >= 500) console.error(err);
+  res.status(status).json({ error: err.message });
 });
 
 app.listen(PUERTO, (err) => {
   if (err) throw err;
   console.log(`Visor de conversaciones en http://localhost:${PUERTO}`);
+  if (!loginActivo) console.warn('Sin login: define CSJD_API_URL y USUARIOS_API_KEY (o VISOR_USUARIO y VISOR_CLAVE)');
+  else if (!lolimsaDisponible) console.warn('Login solo con la cuenta de respaldo: falta USUARIOS_API_KEY para validar en Lolimsa');
+  if (loginActivo) {
+    prepararTabla().then(
+      () => console.log('Tabla visor_usuarios lista'),
+      (e) => console.error('No se pudo preparar la tabla visor_usuarios:', e.message),
+    );
+  }
 });

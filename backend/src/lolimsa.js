@@ -3,12 +3,15 @@
 //   atendida (citas.statte) y pagada en caja (citas.stapag_caj). Una cita anulada en Lolimsa deja de
 //   existir en lolimsa.citas, así que ya no aparece en esa lista.
 // - GET /api/v1/pacientes/documento/{numero} devuelve la ficha del paciente (teléfono registrado, etc.).
+// - GET /api/v1/citas/anuladas?numeros= devuelve quién anuló cada cita y cuándo (auditoría SIG_AUD_CITAS).
 
 const URL_API = process.env.CSJD_API_URL?.replace(/\/+$/, '');
 export const lolimsaConfigurado = Boolean(URL_API);
 
 const VIGENCIA_CITAS_MS = 2 * 60 * 1000;
 const VIGENCIA_PACIENTES_MS = 10 * 60 * 1000;
+const VIGENCIA_ANULACIONES_MS = 10 * 60 * 1000;
+const MAX_NUMEROS_POR_CONSULTA = 200;
 const PARALELAS = 4;
 const cache = new Map(); // ruta -> { hasta, promesa }
 
@@ -58,6 +61,36 @@ export async function consultarDocumentos(consultas, { fresco = false } = {}) {
       resultado.set(documento, { citas: await pedir(ruta, { vigencia: VIGENCIA_CITAS_MS, fresco, sinDatos: [] }) });
     } catch (e) {
       resultado.set(documento, { error: mensajeDeError(e) });
+    }
+  });
+  return resultado;
+}
+
+/**
+ * Quién anuló cada cita y cuándo. Igual que el teléfono, es un dato complementario: si api_csjd no lo tiene
+ * (versión sin ese endpoint) o falla, las citas se muestran sin él.
+ * @returns Map número de cita -> { fecha, usuario, nombre, equipo, ip }
+ */
+export async function anulacionesDeCitas(numeros) {
+  const resultado = new Map();
+  const lotes = [];
+  for (let i = 0; i < numeros.length; i += MAX_NUMEROS_POR_CONSULTA) {
+    lotes.push(numeros.slice(i, i + MAX_NUMEROS_POR_CONSULTA));
+  }
+  await enParalelo(lotes, async (lote) => {
+    try {
+      const ruta = `/api/v1/citas/anuladas?numeros=${[...lote].sort().join(',')}`;
+      for (const a of await pedir(ruta, { vigencia: VIGENCIA_ANULACIONES_MS, sinDatos: [] })) {
+        resultado.set(String(a.numeroCita), {
+          fecha: a.fechaAnulacion,
+          usuario: a.usuario,
+          nombre: a.nombreUsuario,
+          equipo: a.equipo,
+          ip: a.ip,
+        });
+      }
+    } catch {
+      // sin datos de anulación para este lote
     }
   });
   return resultado;

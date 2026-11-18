@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { api } from '../api.js';
 import { fechaHora, paso, telefono as fmtTelefono } from '../formato.js';
 import {
@@ -13,6 +13,7 @@ import {
   Medidor,
   Tarjeta,
 } from './graficos.jsx';
+import SelectorFechas, { fechaCorta, textoRango } from './SelectorFechas.jsx';
 import './panel.css';
 
 const PERIODOS = [
@@ -32,13 +33,13 @@ const COLOR_RESPUESTA = {
   Formulario: 'var(--serie-4)',
   Otro: 'var(--otro)',
 };
-const COLOR_EMBUDO = ['#104281', '#1c5cab', '#2a78d6', '#5598e7', '#86b6ef'];
+// Colores en panel.css (cambian con el modo día/noche)
+const COLOR_EMBUDO = [1, 2, 3, 4, 5].map((n) => `var(--embudo-${n})`);
 
 const soles = new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' });
 const ZONA = 'America/Lima';
 const fmtDia = new Intl.DateTimeFormat('es-PE', { timeZone: 'UTC', day: 'numeric', month: 'short' });
 const fmtDiaLargo = new Intl.DateTimeFormat('es-PE', { timeZone: 'UTC', weekday: 'long', day: 'numeric', month: 'long' });
-const fmtFechaCorta = new Intl.DateTimeFormat('es-PE', { timeZone: ZONA, day: 'numeric', month: 'short' });
 const fmtHoraLima = new Intl.DateTimeFormat('es-PE', { timeZone: ZONA, hour: 'numeric', minute: '2-digit' });
 
 // t llega como "2026-10-15T00" (hora de Lima); se interpreta como UTC solo para darle formato
@@ -69,11 +70,21 @@ function variacion(actual, previo, { mejorSiSube = true, puntos = false } = {}) 
 
 const conversion = (k) => (k.conversaciones ? k.conversacionesConCita / k.conversaciones : null);
 
-function descripcionPeriodo({ dias, desde, hasta }, primerTramo) {
-  const actualizado = `actualizado ${fmtHoraLima.format(new Date(hasta))}`;
+function descripcionPeriodo({ dias, desdeDia, hastaDia }, primerTramo, actualizadoEn) {
+  const actualizado = `actualizado ${fmtHoraLima.format(actualizadoEn)}`;
   if (dias === 1) return `Hoy · ${actualizado}`;
-  if (!desde) return `Todo el historial${primerTramo ? ` desde el ${fmtDia.format(fechaTramo(primerTramo))}` : ''} · ${actualizado}`;
-  return `Del ${fmtFechaCorta.format(new Date(desde))} al ${fmtFechaCorta.format(new Date(hasta))} · ${actualizado}`;
+  if (!desdeDia) return `Todo el historial${primerTramo ? ` desde el ${fmtDia.format(fechaTramo(primerTramo))}` : ''} · ${actualizado}`;
+  if (desdeDia === hastaDia) return `${fechaCorta(desdeDia)} · ${actualizado}`;
+  return `Del ${fechaCorta(desdeDia)} al ${fechaCorta(hastaDia)} · ${actualizado}`;
+}
+
+function IconoCalendario() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+      <rect x="2" y="3" width="12" height="11" rx="2" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M2 6.5h12M5.5 1.5v3M10.5 1.5v3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
 }
 
 function ListaErrores({ errores }) {
@@ -106,19 +117,25 @@ function ListaErrores({ errores }) {
 }
 
 export default function Panel() {
-  const [dias, setDias] = useState(30);
+  // { dias } para los periodos fijos o { desde, hasta } (yyyy-mm-dd) para un rango personalizado
+  const [periodo, setPeriodo] = useState({ dias: 30 });
+  const [selectorAbierto, setSelectorAbierto] = useState(false);
   const [datos, setDatos] = useState(null);
+  const [actualizadoEn, setActualizadoEn] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
+  const cerrarSelector = useCallback(() => setSelectorAbierto(false), []);
+  const clavePeriodo = periodo.desde ? `${periodo.desde}|${periodo.hasta}` : String(periodo.dias);
 
   useEffect(() => {
     let vivo = true;
     const cargar = () =>
       api
-        .estadisticas(dias)
+        .estadisticas(periodo)
         .then((d) => {
           if (!vivo) return;
           setDatos(d);
+          setActualizadoEn(new Date());
           setError(null);
         })
         .catch((e) => vivo && setError(e.message))
@@ -131,26 +148,61 @@ export default function Panel() {
       vivo = false;
       clearInterval(t);
     };
-  }, [dias]);
+    // clavePeriodo resume el periodo: solo se recarga si cambia el rango, no por un objeto nuevo igual
+  }, [clavePeriodo]);
 
   const k = datos?.kpis;
   const prev = datos?.previo;
   const tramo = datos?.periodo.tramo;
-  const textoPrevio = dias === 1 ? 'ayer hasta la misma hora' : `los ${dias} días previos`;
+  const nDias = datos?.periodo.nDias;
+  let textoPrevio = `los ${nDias} días previos`;
+  if (periodo.dias === 1) textoPrevio = 'ayer hasta la misma hora';
+  else if (nDias === 1) textoPrevio = 'el día anterior';
 
   return (
     <div className="panel">
       <div className="panel-cabecera">
         <div>
           <h1>Panel</h1>
-          <p className="tenue">{datos ? descripcionPeriodo(datos.periodo, datos.serie[0]?.t) : 'Cargando…'}</p>
+          <p className="tenue">
+            {datos ? descripcionPeriodo(datos.periodo, datos.serie[0]?.t, actualizadoEn) : 'Cargando…'}
+          </p>
         </div>
-        <div className="periodos" role="group" aria-label="Periodo">
-          {PERIODOS.map((p) => (
-            <button key={p.dias} aria-pressed={dias === p.dias} onClick={() => setDias(p.dias)}>
-              {p.nombre}
+        <div className="filtro-periodo">
+          <div className="periodos" role="group" aria-label="Periodo">
+            {PERIODOS.map((p) => (
+              <button
+                key={p.dias}
+                aria-pressed={!periodo.desde && periodo.dias === p.dias}
+                onClick={() => {
+                  setPeriodo({ dias: p.dias });
+                  setSelectorAbierto(false);
+                }}
+              >
+                {p.nombre}
+              </button>
+            ))}
+            <button
+              className="boton-rango"
+              aria-pressed={Boolean(periodo.desde)}
+              aria-expanded={selectorAbierto}
+              onClick={() => setSelectorAbierto((v) => !v)}
+            >
+              <IconoCalendario />
+              {periodo.desde ? textoRango(periodo.desde, periodo.hasta) : 'Personalizado'}
             </button>
-          ))}
+          </div>
+          {selectorAbierto && (
+            <SelectorFechas
+              desde={periodo.desde}
+              hasta={periodo.hasta}
+              onCerrar={cerrarSelector}
+              onAplicar={(desde, hasta) => {
+                setPeriodo({ desde, hasta });
+                setSelectorAbierto(false);
+              }}
+            />
+          )}
         </div>
       </div>
 

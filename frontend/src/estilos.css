@@ -15,11 +15,54 @@
   --ok-suave: #e3f5e8;
   --aviso: #8a5a00;
   --aviso-suave: #fff4d6;
+  --avatar-fondo: #cfd8dc;
+  --avatar-texto: #37474f;
+  --linea-suave: rgb(0 0 0 / 8%);
+  --realce: rgb(0 0 0 / 4%);
+  --lista-seccion: rgb(255 255 255 / 50%);
+  --segmentado-fondo: #e4e6e9;
+  --fila-hover: #f8f9fa;
+  --sombra: rgb(0 0 0 / 10%);
+  --velo: rgb(0 0 0 / 40%);
+  --deshabilitado: #c4c9ce;
 
+  color-scheme: light;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   font-size: 14px;
   color: var(--texto);
   background: var(--fondo);
+}
+
+/* Modo noche: los mismos roles con otros valores (el tema se elige con el switch del encabezado) */
+:root[data-theme='dark'] {
+  --fondo: #11161a;
+  --superficie: #1b2227;
+  --borde: #2b343b;
+  --texto: #e6e9ec;
+  --tenue: #9aa6af;
+  --acento: #5aa9f0;
+  --acento-suave: #18324a;
+  --fondo-chat: #0e1519;
+  --burbuja-usuario: #202c33;
+  --burbuja-bot: #0f4f43;
+  --error: #f28b82;
+  --error-suave: #3a1f1d;
+  --ok: #81c995;
+  --ok-suave: #1b3324;
+  --aviso: #f6cf6b;
+  --aviso-suave: #3a3013;
+  --avatar-fondo: #34414a;
+  --avatar-texto: #d5dde3;
+  --linea-suave: rgb(255 255 255 / 10%);
+  --realce: rgb(255 255 255 / 6%);
+  --lista-seccion: rgb(255 255 255 / 4%);
+  --segmentado-fondo: #262f36;
+  --fila-hover: #222b31;
+  --sombra: rgb(0 0 0 / 45%);
+  --velo: rgb(0 0 0 / 60%);
+  --deshabilitado: #4a555c;
+
+  color-scheme: dark;
 }
 
 * {
@@ -28,6 +71,7 @@
 
 body {
   margin: 0;
+  background: var(--fondo);
 }
 
 button {
@@ -151,8 +195,88 @@ h3 {
   margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   font-size: 13px;
+}
+
+/* Switch día / noche: perilla que se desliza sobre un sol y una luna */
+.switch-tema {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 50px;
+  height: 26px;
+  margin-right: 8px;
+  padding: 0 7px;
+  border: 1px solid var(--borde);
+  border-radius: 13px;
+  background: var(--segmentado-fondo);
+  flex-shrink: 0;
+}
+
+.switch-tema-icono {
+  display: grid;
+  color: var(--tenue);
+}
+
+.switch-tema-perilla {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--superficie);
+  box-shadow: 0 1px 3px var(--sombra);
+  transition: transform 0.2s ease;
+}
+
+.switch-tema[aria-checked='true'] .switch-tema-perilla {
+  transform: translateX(24px);
+}
+
+.switch-tema:focus-visible {
+  outline: 2px solid var(--acento);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switch-tema-perilla {
+    transition: none;
+  }
+}
+
+.usuario-sesion {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 4px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.usuario-sesion svg {
+  color: var(--tenue);
+}
+
+.engranaje {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  color: var(--tenue);
+}
+
+.engranaje:hover {
+  background: var(--fondo);
+  color: var(--texto);
+}
+
+.engranaje.activa {
+  background: var(--acento-suave);
+  color: var(--acento);
 }
 
 .app {
@@ -234,6 +358,7 @@ h3 {
   border-radius: 8px;
   font: inherit;
   color: var(--texto);
+  background: var(--superficie);
 }
 
 .login input:focus {
@@ -362,8 +487,8 @@ h3 {
   border-radius: 50%;
   display: grid;
   place-items: center;
-  background: #cfd8dc;
-  color: #37474f;
+  background: var(--avatar-fondo);
+  color: var(--avatar-texto);
   font-weight: 600;
   text-transform: uppercase;
 }
@@ -583,7 +708,7 @@ h3 {
   display: flex;
   flex-direction: column;
   margin: 6px -9px -4px;
-  border-top: 1px solid rgb(0 0 0 / 8%);
+  border-top: 1px solid var(--linea-suave);
 }
 
 .accion {
@@ -596,12 +721,12 @@ h3 {
 }
 
 .accion + .accion {
-  border-top: 1px solid rgb(0 0 0 / 8%);
+  border-top: 1px solid var(--linea-suave);
 }
 
 a.accion:hover,
 summary.accion:hover {
-  background: rgb(0 0 0 / 4%);
+  background: var(--realce);
 }
 
 .lista-opciones summary {
@@ -614,12 +739,12 @@ summary.accion:hover {
 }
 
 .lista-opciones[open] summary {
-  border-bottom: 1px solid rgb(0 0 0 / 8%);
+  border-bottom: 1px solid var(--linea-suave);
 }
 
 .seccion {
   padding: 4px 10px 6px;
-  background: rgb(255 255 255 / 50%);
+  background: var(--lista-seccion);
 }
 
 .seccion-titulo {
@@ -632,7 +757,7 @@ summary.accion:hover {
 
 .fila-opcion {
   padding: 4px 0;
-  border-bottom: 1px solid rgb(0 0 0 / 5%);
+  border-bottom: 1px solid var(--linea-suave);
 }
 
 .fila-opcion:last-child {
@@ -758,7 +883,7 @@ summary.accion:hover {
 .modal-fondo {
   position: fixed;
   inset: 0;
-  background: rgb(0 0 0 / 40%);
+  background: var(--velo);
   display: grid;
   place-items: center;
   padding: 16px;
@@ -816,6 +941,34 @@ summary.accion:hover {
 @media (max-width: 760px) {
   .app {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Encabezado angosto: sin marca ni nombre (queda en el tooltip del ícono) para que entre todo */
+  .barra-superior {
+    padding: 0 6px;
+    gap: 0;
+  }
+
+  .marca,
+  .nombre-usuario {
+    display: none;
+  }
+
+  .pestana {
+    padding: 0 7px;
+    font-size: 13px;
+  }
+
+  .sesion {
+    gap: 2px;
+  }
+
+  .switch-tema {
+    margin-right: 2px;
+  }
+
+  .usuario-sesion {
+    margin-right: 0;
   }
 
   .app.con-chat .lista,
