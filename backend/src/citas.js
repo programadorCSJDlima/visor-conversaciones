@@ -48,15 +48,30 @@ function pagoConLink(ordenes) {
     links: ordenes.length,
     pagadoEn: o.pagado_en,
     venceEn: o.vence_en,
+    // Con este id la tesorería ubica el pago en el portal de Niubiz ("External Id de Orden")
+    externalId: o.external_id,
     prefactura: o.numero_prefactura,
     factura: o.numero_factura,
   };
 }
 
+// Cobro en caja según Lolimsa. citas.stapag_caj ("pagada") lo marca también api_csjd apenas Niubiz confirma un
+// pago con link, antes de que caja emita la boleta: lo que confirma el cobro en caja es el comprobante (boleta o
+// factura) de la prefactura de la cita.
+//   COMPROBANTE        caja ya emitió boleta o factura
+//   FALTA_COMPROBANTE  marcada pagada, pero su prefactura aún no tiene boleta (típico de los pagos con link)
+//   POR_PAGAR          sin marca de pagada ni comprobante
+//   MARCADA            marcada pagada; api_csjd no informó comprobantes (versión anterior o error al consultarlos)
+function cobroEnCaja({ pagada, comprobantes }) {
+  if (comprobantes?.length) return 'COMPROBANTE';
+  if (!pagada) return 'POR_PAGAR';
+  return Array.isArray(comprobantes) ? 'FALTA_COMPROBANTE' : 'MARCADA';
+}
+
 function estadoFinal(pago, lolimsa) {
   if (lolimsa?.consultada && !lolimsa.existe) return 'ANULADA';
   if (lolimsa?.atendida) return 'ATENDIDA';
-  if (pago.estado === 'PAGADA' || lolimsa?.pagada) return 'PAGADA';
+  if (pago.estado === 'PAGADA' || lolimsa?.pagada || lolimsa?.cobro === 'COMPROBANTE') return 'PAGADA';
   return 'PENDIENTE';
 }
 
@@ -96,7 +111,7 @@ export async function citasAgendadas(dias, { fresco = false } = {}) {
     pool.query(`select telefono, datos from chatbot_conversaciones where telefono = any($1)`, [telefonos]),
     pool.query(
       `select c.numero_cita::text as numero, c.numero_prefactura, c.numero_factura,
-              o.estado, o.creado_en, o.vence_en, o.pagado_en
+              o.external_id, o.estado, o.creado_en, o.vence_en, o.pagado_en
        from orden_pago_cita c join orden_pago o using (external_id)
        where c.numero_cita = any($1::bigint[])
        order by o.creado_en`,
@@ -169,6 +184,10 @@ export async function citasAgendadas(dias, { fresco = false } = {}) {
             existe: true,
             atendida: enLolimsa.atendida,
             pagada: enLolimsa.pagada,
+            prefactura: enLolimsa.prefactura ?? null,
+            // null: api_csjd no los informó; [] : la prefactura aún no tiene boleta
+            comprobantes: enLolimsa.comprobantes ?? null,
+            cobro: cobroEnCaja(enLolimsa),
             fecha: enLolimsa.fecha,
             hora: enLolimsa.hora,
             servicio: enLolimsa.servicio,

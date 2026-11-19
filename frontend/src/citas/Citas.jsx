@@ -58,10 +58,15 @@ function PagoConLink({ pago }) {
     case 'PAGADA':
       return (
         <>
-          <Insignia clase="bueno" icono="✓">
+          <Insignia clase="bueno" icono="✓" title="Pago confirmado por Niubiz">
             Pagado
           </Insignia>
           <div className="tenue chico">{momento(pago.pagadoEn)}</div>
+          {pago.externalId && (
+            <div className="id-niubiz" title="External Id de la orden en el portal de Niubiz">
+              {pago.externalId}
+            </div>
+          )}
         </>
       );
     case 'PENDIENTE':
@@ -122,30 +127,93 @@ function EnLolimsa({ lolimsa, fecha }) {
   }
   const yaPaso = fecha && fecha < hoyLima();
   return (
-    <div className="insignias">
-      {lolimsa.pagada ? (
-        <Insignia clase="bueno" icono="✓">
+    <>
+      <div className="insignias">
+        <CobroEnCaja lolimsa={lolimsa} />
+        {lolimsa.atendida ? (
+          <Insignia clase="info" icono="✓">
+            Atendida
+          </Insignia>
+        ) : (
+          yaPaso && (
+            <Insignia clase="serio" icono="!">
+              Sin atender
+            </Insignia>
+          )
+        )}
+      </div>
+      {lolimsa.cobro === 'COMPROBANTE' &&
+        lolimsa.comprobantes.map((b) => (
+          <div
+            key={`${b.tipo}-${b.serie}-${b.numero}`}
+            className="comprobante chico"
+            title={[
+              b.usuario && `Emitida por ${b.usuario}`,
+              b.total != null && soles.format(b.total),
+              b.medioPago && `Medio de pago en caja: ${b.medioPago}`,
+              !b.cobrado && 'Sin cobrar',
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          >
+            {textoComprobante(b)}
+            <span className="tenue">
+              {b.fecha && ` · ${momentoLocal(b.fecha)}`}
+              {b.caja && ` · caja ${b.caja}`}
+            </span>
+          </div>
+        ))}
+      {lolimsa.cobro === 'FALTA_COMPROBANTE' && lolimsa.prefactura && (
+        <div className="comprobante tenue chico">Prefactura {lolimsa.prefactura}</div>
+      )}
+    </>
+  );
+}
+
+const EMITIDO = { BO: 'Boleta emitida', FA: 'Factura emitida' };
+const textoComprobante = (b) => `${b.tipo ?? ''} ${b.serie ? `${b.serie}-` : ''}${b.numero}`.trim();
+const textoComprobantes = (l) => (l.comprobantes ?? []).map(textoComprobante).join(' / ');
+
+// "Pagada" en Lolimsa (citas.stapag_caj) también lo marca api_csjd al confirmarse el pago con link:
+// lo que confirma el cobro en caja es la boleta de la prefactura
+function CobroEnCaja({ lolimsa }) {
+  switch (lolimsa.cobro) {
+    case 'COMPROBANTE': {
+      const tipos = [...new Set(lolimsa.comprobantes.map((b) => b.tipo))];
+      const nombre = tipos.length === 1 ? (EMITIDO[tipos[0]] ?? 'Comprobante emitido') : 'Comprobantes emitidos';
+      return (
+        <Insignia clase="bueno" icono="✓" title="Caja ya emitió el comprobante de la prefactura">
+          {nombre}
+        </Insignia>
+      );
+    }
+    case 'FALTA_COMPROBANTE':
+      return (
+        <Insignia
+          clase="aviso"
+          icono="!"
+          title="Figura como pagada en Lolimsa, pero caja aún no emite la boleta de su prefactura"
+        >
+          Falta boleta
+        </Insignia>
+      );
+    case 'MARCADA':
+      return (
+        <Insignia clase="bueno" icono="✓" title="Marcada como pagada en Lolimsa (sin datos de la boleta)">
           Pagada
         </Insignia>
-      ) : (
+      );
+    default:
+      return (
         <Insignia clase="aviso" icono="⏳">
           Por pagar
         </Insignia>
-      )}
-      {lolimsa.atendida ? (
-        <Insignia clase="info" icono="✓">
-          Atendida
-        </Insignia>
-      ) : (
-        yaPaso && (
-          <Insignia clase="serio" icono="!">
-            Sin atender
-          </Insignia>
-        )
-      )}
-    </div>
-  );
+      );
+  }
 }
+
+// Pagada con link (Niubiz) pero su prefactura aún no tiene boleta en caja
+const faltaBoleta = (c) => c.estado !== 'ANULADA' && c.pago.estado === 'PAGADA' && c.lolimsa.cobro === 'FALTA_COMPROBANTE';
 
 // WhatsApp desde el que agendó; si WhatsApp lo oculta, el registrado en Lolimsa
 function Telefono({ paciente }) {
@@ -178,8 +246,9 @@ function descargarCsv(citas) {
   const columnas = [
     'Estado', 'N° cita', 'Agendada', 'Paciente', 'Tipo doc.', 'Documento', 'Historia', 'Teléfono WhatsApp',
     'Teléfono registrado (Lolimsa)', 'Especialidad', 'Médico',
-    'Fecha cita', 'Hora', 'Consultorio', 'Precio', 'Pago con link', 'Pagado el', 'En Lolimsa', 'Pagada en Lolimsa',
-    'Atendida', 'Anulada por', 'Usuario Lolimsa', 'Fecha de anulación', 'Equipo de anulación', 'Conversación',
+    'Fecha cita', 'Hora', 'Consultorio', 'Precio', 'Pago con link', 'Pagado el', 'External Id Niubiz', 'En Lolimsa',
+    'Marcada pagada en Lolimsa', 'Prefactura', 'Boleta en caja', 'Atendida', 'Anulada por', 'Usuario Lolimsa',
+    'Fecha de anulación', 'Equipo de anulación', 'Conversación',
   ];
   const filas = citas.map((c) => [
     ESTADOS[c.estado].nombre,
@@ -199,8 +268,19 @@ function descargarCsv(citas) {
     c.cita.precio ?? '',
     c.pago.estado,
     c.pago.pagadoEn ? fechaHora(c.pago.pagadoEn) : '',
+    c.pago.externalId ?? '',
     !c.lolimsa.consultada ? 'Sin consultar' : c.lolimsa.existe ? 'Sí' : 'No (anulada)',
     c.lolimsa.existe ? (c.lolimsa.pagada ? 'Sí' : 'No') : '',
+    c.lolimsa.prefactura ?? '',
+    !c.lolimsa.existe
+      ? ''
+      : c.lolimsa.cobro === 'COMPROBANTE'
+        ? textoComprobantes(c.lolimsa)
+        : c.lolimsa.cobro === 'FALTA_COMPROBANTE'
+          ? 'Falta boleta'
+          : c.lolimsa.cobro === 'MARCADA'
+            ? 'Sin dato'
+            : 'Por pagar',
     c.lolimsa.existe ? (c.lolimsa.atendida ? 'Sí' : 'No') : '',
     c.lolimsa.anulacion?.nombre ?? '',
     c.lolimsa.anulacion?.usuario ?? '',
@@ -225,7 +305,9 @@ function descargarCsv(citas) {
 
 const ORDEN_ESTADO = { PENDIENTE: 0, PAGADA: 1, ATENDIDA: 2, ANULADA: 3 };
 const ORDEN_PAGO = { PAGADA: 0, PENDIENTE: 1, REVISAR: 2, VENCIDA: 3, SIN_LINK: 4 };
-const ordenLolimsa = (l) => (!l.consultada ? 4 : !l.existe ? 3 : l.atendida ? 2 : l.pagada ? 1 : 0);
+// Por cobrar primero, luego las que esperan boleta, las cobradas en caja, atendidas, anuladas y sin consultar
+const ORDEN_COBRO = { POR_PAGAR: 0, FALTA_COMPROBANTE: 1, MARCADA: 2, COMPROBANTE: 2 };
+const ordenLolimsa = (l) => (!l.consultada ? 5 : !l.existe ? 4 : l.atendida ? 3 : (ORDEN_COBRO[l.cobro] ?? 0));
 
 // valor: lo que se compara al ordenar por esa columna (null va siempre al final)
 const COLUMNAS = [
@@ -390,14 +472,17 @@ export default function Citas() {
       conLink: pagadas.filter((c) => c.pago.estado === 'PAGADA').length,
       enCaja: pagadas.filter((c) => c.pago.estado !== 'PAGADA').length,
       atendidas: pagadas.filter((c) => c.estado === 'ATENDIDA').length,
+      sinBoleta: pagadas.filter(faltaBoleta).length,
     };
   }, [datos]);
 
   const visibles = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
+    const enFiltro = (c) =>
+      filtro === 'VIGENTES' ? c.estado !== 'ANULADA' : filtro === 'SIN_BOLETA' ? faltaBoleta(c) : c.estado === filtro;
     const lista = (datos?.citas ?? []).filter(
       (c) =>
-        (filtro === 'VIGENTES' ? c.estado !== 'ANULADA' : c.estado === filtro) &&
+        enFiltro(c) &&
         (!q ||
           [
             c.numero,
@@ -410,6 +495,9 @@ export default function Citas() {
             c.cita.medico,
             c.lolimsa.anulacion?.nombre,
             c.lolimsa.anulacion?.usuario,
+            c.pago.externalId,
+            c.lolimsa.prefactura,
+            textoComprobantes(c.lolimsa),
           ]
             .filter(Boolean)
             .some((v) => String(v).toLowerCase().includes(q))),
@@ -516,6 +604,16 @@ export default function Citas() {
               <span className="tenue">
                 {pagos.conLink} con link · {pagos.enCaja} en caja · {pagos.atendidas} ya atendidas
               </span>
+              {pagos.sinBoleta > 0 && (
+                <button
+                  className="filtro-sin-boleta"
+                  aria-pressed={filtro === 'SIN_BOLETA'}
+                  onClick={() => filtrar(filtro === 'SIN_BOLETA' ? 'VIGENTES' : 'SIN_BOLETA')}
+                  title="Pagadas con link cuya prefactura aún no tiene boleta en caja. Clic para ver solo esas."
+                >
+                  <span aria-hidden="true">!</span> {pagos.sinBoleta} con link sin boleta en caja
+                </button>
+              )}
             </p>
           )}
 

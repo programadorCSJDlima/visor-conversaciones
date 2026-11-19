@@ -204,10 +204,19 @@ Cada gráfico tiene un botón **Tabla** con los datos exactos.
 
 Cada cita que agendó el bot, con:
 
-- **Pago con link** (juanita_db): pagado, link activo, link vencido o sin link.
-- **Estado en Lolimsa**: si sigue existiendo, si está pagada (en caja o con el link) y si
-  fue atendida. Una cita anulada en Lolimsa desaparece de `lolimsa.citas`, así que se
-  muestra como **Anulada**.
+- **Pago con link** (juanita_db): pagado, link activo, link vencido o sin link. Los pagados
+  muestran el *External Id* de la orden, el que se busca en el portal de Niubiz.
+- **Estado en Lolimsa**: si sigue existiendo, si caja ya emitió la boleta y si fue atendida.
+  Una cita anulada en Lolimsa desaparece de `lolimsa.citas`, así que se muestra como **Anulada**.
+  - **Boleta emitida** (con serie-número, fecha y caja): la prefactura de la cita tiene un
+    comprobante vigente en `lolimsa.facturas`.
+  - **Falta boleta**: la cita figura pagada (`citas.stapag_caj = 'S'`) pero su prefactura aún no
+    tiene boleta. Es lo normal en los pagos con link mientras `PAGOS_FACTURAR_CON_SP=false`:
+    api_csjd marca la cita y crea la prefactura, y caja emite la boleta. Ojo: `stapag_caj` solo
+    no confirma el cobro en caja, porque lo marca la propia api_csjd.
+  - **Por pagar**: sin marca de pagada ni comprobante.
+  El resumen muestra cuántas pagadas con link siguen sin boleta; al hacer clic se filtran.
+  Se puede buscar por External Id, prefactura o número de boleta.
 - **Estado final** para filtrar: pendiente de pago, pagada por atender, atendida o anulada.
   Cada cita está en un solo estado: una cita pagada y ya atendida cuenta como atendida.
   Debajo de los filtros se muestra el total de pagadas (con link, en caja y ya atendidas).
