@@ -32,29 +32,39 @@ const comoLike = (q) => `%${q.replace(/[\\%_]/g, '\\$&')}%`;
 // yyyy-mm-dd que además sea una fecha real (descarta, p. ej., 2026-02-31)
 const esFecha = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s ?? '') && new Date(`${s}T00:00:00Z`).toISOString().startsWith(s);
 
-// ?dias=1|7|30|90|0 (0 = todo el historial) o ?desde=yyyy-mm-dd&hasta=yyyy-mm-dd (ambas incluidas)
-app.get('/api/estadisticas', async (req, res) => {
+// Periodo del panel y de Citas: ?dias=1|7|30|90|0 (0 = todo el historial) o ?desde=yyyy-mm-dd&hasta=yyyy-mm-dd
+// (ambas incluidas). Si no es válido responde 400 y devuelve null.
+function leerPeriodo(req, res) {
   const { desde, hasta } = req.query;
   if (desde || hasta) {
     if (!esFecha(desde) || !esFecha(hasta) || desde > hasta) {
-      return res.status(400).json({ error: 'desde y hasta deben ser fechas yyyy-mm-dd, con desde <= hasta' });
+      res.status(400).json({ error: 'desde y hasta deben ser fechas yyyy-mm-dd, con desde <= hasta' });
+      return null;
     }
     if ((Date.parse(hasta) - Date.parse(desde)) / 864e5 + 1 > MAX_DIAS_RANGO) {
-      return res.status(400).json({ error: `El rango puede tener como máximo ${MAX_DIAS_RANGO} días` });
+      res.status(400).json({ error: `El rango puede tener como máximo ${MAX_DIAS_RANGO} días` });
+      return null;
     }
-    return res.json(await estadisticas({ desde, hasta }));
+    return { desde, hasta };
   }
   const dias = Number(req.query.dias ?? 30);
-  if (!PERIODOS.includes(dias)) return res.status(400).json({ error: `dias debe ser uno de: ${PERIODOS}` });
-  res.json(await estadisticas({ dias }));
+  if (!PERIODOS.includes(dias)) {
+    res.status(400).json({ error: `dias debe ser uno de: ${PERIODOS}` });
+    return null;
+  }
+  return { dias };
+}
+
+app.get('/api/estadisticas', async (req, res) => {
+  const periodo = leerPeriodo(req, res);
+  if (periodo) res.json(await estadisticas(periodo));
 });
 
 // Citas agendadas por el bot, con su pago por link y su estado en Lolimsa (mismos periodos que el panel)
 app.get('/api/citas', async (req, res) => {
-  const dias = Number(req.query.dias ?? 30);
-  if (!PERIODOS.includes(dias)) return res.status(400).json({ error: `dias debe ser uno de: ${PERIODOS}` });
+  const periodo = leerPeriodo(req, res);
   // ?fresco=1 vuelve a consultar Lolimsa aunque haya una respuesta reciente en memoria
-  res.json(await citasAgendadas(dias, { fresco: req.query.fresco === '1' }));
+  if (periodo) res.json(await citasAgendadas(periodo, { fresco: req.query.fresco === '1' }));
 });
 
 app.get('/api/conversaciones', async (req, res) => {

@@ -199,6 +199,31 @@
   box-shadow: inset 0 0 0 1px var(--aviso-texto);
 }
 
+/* Reservadas fuera del chatbot y pagadas con su link: mismo botón-filtro, en azul informativo */
+.filtro-sin-boleta.fuera-chatbot {
+  background: var(--info-fondo);
+  color: var(--info-texto);
+}
+
+.filtro-sin-boleta.fuera-chatbot:hover,
+.filtro-sin-boleta.fuera-chatbot[aria-pressed='true'] {
+  border-color: var(--info-texto);
+}
+
+.filtro-sin-boleta.fuera-chatbot[aria-pressed='true'] {
+  box-shadow: inset 0 0 0 1px var(--info-texto);
+}
+
+.origen-cita {
+  margin-top: 2px;
+}
+
+/* El subtítulo de Citas es largo y los periodos bajan de línea: se mantienen a la derecha para que el
+   calendario (alineado a la derecha) no se salga de la pantalla */
+.citas .panel-cabecera .filtro-periodo {
+  margin-left: auto;
+}
+
 .id-niubiz {
   margin-top: 2px;
   font-family: ui-monospace, Consolas, monospace;

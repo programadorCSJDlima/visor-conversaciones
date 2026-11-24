@@ -97,21 +97,25 @@ export async function anulacionesDeCitas(numeros) {
 }
 
 /**
- * Teléfono registrado en Lolimsa de cada documento. Si no se pudo consultar, el documento no aparece:
- * es un dato complementario y no debe impedir mostrar las citas.
- * @returns Map documento -> teléfono
+ * Ficha de Lolimsa de cada documento: nombre, tipo de documento y teléfono registrado. Si no se pudo consultar,
+ * el documento no aparece: es un dato complementario y no debe impedir mostrar las citas.
+ * @returns Map documento -> { nombre, tipoDocumento, telefono }
  */
-export async function telefonosRegistrados(documentos) {
+export async function fichasDePacientes(documentos) {
   const resultado = new Map();
   await enParalelo(documentos, async (documento) => {
     try {
       const ruta = `/api/v1/pacientes/documento/${encodeURIComponent(documento)}`;
       const paciente = await pedir(ruta, { vigencia: VIGENCIA_PACIENTES_MS, sinDatos: null });
       // nuevo: el documento no está registrado en Lolimsa (los datos vienen de RENIEC)
-      const telefono = paciente && !paciente.nuevo ? paciente.telefono?.trim() : null;
-      if (telefono) resultado.set(documento, telefono);
+      if (!paciente || paciente.nuevo) return;
+      resultado.set(documento, {
+        nombre: [paciente.nombres, paciente.apellidoPaterno, paciente.apellidoMaterno].filter(Boolean).join(' ') || null,
+        tipoDocumento: paciente.tipoDocumentoDescripcion?.replace(/\./g, '') || null,
+        telefono: paciente.telefono?.trim() || null,
+      });
     } catch {
-      // sin teléfono registrado para este documento
+      // sin ficha para este documento
     }
   });
   return resultado;

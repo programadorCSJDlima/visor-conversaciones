@@ -96,7 +96,7 @@ Endpoints:
 | GET | `/api/mensajes/:id` | Mensaje con su payload completo de WhatsApp |
 | GET | `/api/estadisticas?dias=1\|7\|30\|90\|0` | Todo lo que muestra el panel (0 = todo el historial) |
 | GET | `/api/estadisticas?desde=yyyy-mm-dd&hasta=yyyy-mm-dd` | Lo mismo para un rango de fechas de Lima, ambas incluidas (máximo 366 días) |
-| GET | `/api/citas?dias=…&fresco=1` | Citas agendadas por el bot con su pago y su estado en Lolimsa (`fresco=1` no usa la respuesta guardada de Lolimsa) |
+| GET | `/api/citas?dias=…&fresco=1` (o `?desde=yyyy-mm-dd&hasta=yyyy-mm-dd`) | Citas agendadas por el bot (y las reservadas en otro canal pagadas con su link, `origen: PAGO_LINK`) con su pago y su estado en Lolimsa (`fresco=1` no usa la respuesta guardada de Lolimsa) |
 
 ## Frontend
 
@@ -202,7 +202,11 @@ Cada gráfico tiene un botón **Tabla** con los datos exactos.
 
 ### Citas (`#/citas`)
 
-Cada cita que agendó el bot, con:
+Cada cita que agendó el bot y, además, las **reservadas fuera del chatbot** (ventanilla,
+teléfono) que el paciente pagó con un link del bot (opción "Pagar mis citas"). Estas llevan la
+etiqueta *Reservada fuera del chatbot*, se ubican por su orden de pago pagada (o en revisión)
+y el período se cuenta desde que se generó ese link; las que solo tienen links vencidos no se
+listan. El resumen muestra cuántas son; al hacer clic se filtran. Cada cita trae:
 
 - **Pago con link** (juanita_db): pagado, link activo, link vencido o sin link. Los pagados
   muestran el *External Id* de la orden, el que se busca en el portal de Niubiz.
@@ -222,7 +226,9 @@ Cada cita que agendó el bot, con:
   Debajo de los filtros se muestra el total de pagadas (con link, en caja y ya atendidas).
   El Panel, en cambio, cuenta solo las citas pagadas con link.
 
-Se puede buscar por paciente, documento, N° de cita, especialidad o médico y descargar
+Se filtra por periodo igual que el panel (hoy, 7, 30, 90 días, todo o un rango personalizado de
+hasta 366 días), según la fecha en que el bot agendó la cita (las reservadas fuera del chatbot,
+según su link pagado). Se puede buscar por paciente, documento, N° de cita, especialidad o médico y descargar
 la lista filtrada en CSV.
 
 Lolimsa se consulta a través de `api_csjd` (`GET /api/v1/citas?numeroDocumento=`), que ya
@@ -236,7 +242,10 @@ CSJD_API_URL=http://10.10.0.133:8081
 Como esa API busca por documento, el visor identifica el documento de cada cita con el
 mensaje "Revisa tu cita" que el bot envía antes de confirmarla (muestra los últimos
 dígitos, p. ej. `DNI ••••8841`) y los documentos que el paciente escribió en la
-conversación. Las respuestas de Lolimsa se guardan 2 minutos en memoria; el botón
+conversación. En las reservadas fuera del chatbot no hay "Revisa tu cita": se prueban los
+documentos que el paciente escribió antes de pedir el link y se queda el que tiene esa cita
+en Lolimsa; el nombre sale de su ficha (`GET /api/v1/pacientes/documento/{numero}`).
+Las respuestas de Lolimsa se guardan 2 minutos en memoria; el botón
 **Actualizar** las vuelve a pedir.
 
 ### Textos del bot que usa el visor
@@ -246,5 +255,6 @@ Las citas (en el panel y en Citas) se leen de mensajes fijos del bot:
 - Confirmación: "Tu cita quedó registrada" con N° de cita, especialidad, médico,
   consultorio, fecha, hora y precio.
 - Revisión previa: "Revisa tu cita" con el paciente y los últimos dígitos del documento.
+- Link de pago (solo en Citas): "Tu enlace de pago está listo" con el N° de cada cita que paga.
 
 Si cambian esos textos en el chatbot, hay que ajustar `backend/src/confirmaciones.js`.

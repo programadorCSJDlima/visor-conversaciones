@@ -31,6 +31,12 @@ const usuarioVisor = (u) => `/api/configuracion/usuarios/${encodeURIComponent(u)
 
 const tel = (t) => encodeURIComponent(t);
 
+const parametrosPeriodo = (periodo, extra = {}) =>
+  new URLSearchParams({
+    ...(periodo.desde ? { desde: periodo.desde, hasta: periodo.hasta } : { dias: periodo.dias }),
+    ...extra,
+  });
+
 export const api = {
   sesion: () => get('/api/sesion'),
   login: (usuario, clave) => post('/api/login', { usuario, clave }),
@@ -41,9 +47,9 @@ export const api = {
     get(`/api/conversaciones/${tel(t)}/mensajes?${new URLSearchParams(params)}`),
   mensaje: (id) => get(`/api/mensajes/${id}`),
   // periodo: { dias } o { desde, hasta } (yyyy-mm-dd)
-  estadisticas: (periodo) =>
-    get(`/api/estadisticas?${new URLSearchParams(periodo.desde ? { desde: periodo.desde, hasta: periodo.hasta } : { dias: periodo.dias })}`),
-  citas: (dias, fresco) => get(`/api/citas?dias=${dias}${fresco ? '&fresco=1' : ''}`),
+  estadisticas: (periodo) => get(`/api/estadisticas?${parametrosPeriodo(periodo)}`),
+  citas: (periodo, fresco) =>
+    get(`/api/citas?${parametrosPeriodo(periodo, fresco ? { fresco: '1' } : {})}`),
 
   // Engranaje (solo administradores)
   configuracion: () => get('/api/configuracion'),

@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api.js';
 import { fechaHora, telefono as fmtTelefono } from '../formato.js';
+import SelectorFechas, { fechaCorta, IconoCalendario, textoRango } from '../panel/SelectorFechas.jsx';
 import '../panel/panel.css';
 import './citas.css';
 
 const PERIODOS = [
-  { dias: 1, nombre: 'Hoy' },
-  { dias: 7, nombre: '7 días' },
-  { dias: 30, nombre: '30 días' },
-  { dias: 90, nombre: '90 días' },
-  { dias: 0, nombre: 'Todo' },
+  { dias: 1, nombre: 'Hoy', descripcion: 'Agendadas hoy' },
+  { dias: 7, nombre: '7 días', descripcion: 'Agendadas en los últimos 7 días' },
+  { dias: 30, nombre: '30 días', descripcion: 'Agendadas en los últimos 30 días' },
+  { dias: 90, nombre: '90 días', descripcion: 'Agendadas en los últimos 90 días' },
+  { dias: 0, nombre: 'Todo', descripcion: 'Todo el historial' },
 ];
 const REFRESCO_MS = 2 * 60 * 1000;
 
@@ -215,6 +216,10 @@ function CobroEnCaja({ lolimsa }) {
 // Pagada con link (Niubiz) pero su prefactura aún no tiene boleta en caja
 const faltaBoleta = (c) => c.estado !== 'ANULADA' && c.pago.estado === 'PAGADA' && c.lolimsa.cobro === 'FALTA_COMPROBANTE';
 
+// Reservada en otro canal (ventanilla, teléfono) y pagada con un link del chatbot
+const fueraDelChatbot = (c) => c.origen === 'PAGO_LINK';
+const AYUDA_FUERA = 'Se reservó por otro canal (ventanilla o teléfono) y el paciente la pagó con un link del chatbot';
+
 // WhatsApp desde el que agendó; si WhatsApp lo oculta, el registrado en Lolimsa
 function Telefono({ paciente }) {
   if (paciente.telefono) {
@@ -242,9 +247,19 @@ function Telefono({ paciente }) {
   );
 }
 
-function descargarCsv(citas) {
+// Texto del periodo elegido, como en el panel ("Del 3 nov al 10 nov")
+function descripcionPeriodo(periodo) {
+  if (periodo.desde) {
+    return periodo.desde === periodo.hasta
+      ? `Agendadas el ${fechaCorta(periodo.desde)}`
+      : `Agendadas del ${fechaCorta(periodo.desde)} al ${fechaCorta(periodo.hasta)}`;
+  }
+  return PERIODOS.find((p) => p.dias === periodo.dias)?.descripcion;
+}
+
+function descargarCsv(citas, periodo) {
   const columnas = [
-    'Estado', 'N° cita', 'Agendada', 'Paciente', 'Tipo doc.', 'Documento', 'Historia', 'Teléfono WhatsApp',
+    'Estado', 'N° cita', 'Origen', 'Agendada', 'Paciente', 'Tipo doc.', 'Documento', 'Historia', 'Teléfono WhatsApp',
     'Teléfono registrado (Lolimsa)', 'Especialidad', 'Médico',
     'Fecha cita', 'Hora', 'Consultorio', 'Precio', 'Pago con link', 'Pagado el', 'External Id Niubiz', 'En Lolimsa',
     'Marcada pagada en Lolimsa', 'Prefactura', 'Boleta en caja', 'Atendida', 'Anulada por', 'Usuario Lolimsa',
@@ -253,7 +268,8 @@ function descargarCsv(citas) {
   const filas = citas.map((c) => [
     ESTADOS[c.estado].nombre,
     c.numero,
-    fechaHora(c.agendadaEn),
+    fueraDelChatbot(c) ? 'Reservada fuera del chatbot, pagada con link' : 'Agendada por el chatbot',
+    fueraDelChatbot(c) ? '' : fechaHora(c.agendadaEn),
     c.paciente.nombre ?? '',
     c.paciente.tipoDocumento ?? '',
     c.paciente.documento ?? '',
@@ -286,7 +302,7 @@ function descargarCsv(citas) {
     c.lolimsa.anulacion?.usuario ?? '',
     c.lolimsa.anulacion?.fecha?.replace('T', ' ') ?? '',
     c.lolimsa.anulacion?.equipo ?? '',
-    c.telefono,
+    c.telefono ?? '',
   ]);
   const celda = (v) => {
     const s = String(v);
@@ -296,7 +312,9 @@ function descargarCsv(citas) {
   const url = URL.createObjectURL(new Blob(['﻿', csv], { type: 'text/csv;charset=utf-8' }));
   const a = document.createElement('a');
   a.href = url;
-  a.download = `citas-chatbot-${hoyLima()}.csv`;
+  a.download = periodo.desde
+    ? `citas-chatbot-${periodo.desde}${periodo.hasta !== periodo.desde ? `_al_${periodo.hasta}` : ''}.csv`
+    : `citas-chatbot-${hoyLima()}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -312,7 +330,12 @@ const ordenLolimsa = (l) => (!l.consultada ? 5 : !l.existe ? 4 : l.atendida ? 3 
 // valor: lo que se compara al ordenar por esa columna (null va siempre al final)
 const COLUMNAS = [
   { id: 'estado', nombre: 'Estado', valor: (c) => ORDEN_ESTADO[c.estado] },
-  { id: 'cita', nombre: 'Cita', ayuda: 'Ordenar por fecha en que se agendó', valor: (c) => c.agendadaEn },
+  {
+    id: 'cita',
+    nombre: 'Cita',
+    ayuda: 'Ordenar por fecha en que se agendó (las reservadas fuera del chatbot, por la fecha de su link de pago)',
+    valor: (c) => c.agendadaEn,
+  },
   { id: 'paciente', nombre: 'Paciente', valor: (c) => c.paciente.nombre?.toLowerCase() ?? null },
   { id: 'telefono', nombre: 'Teléfono', valor: (c) => c.paciente.telefono ?? c.paciente.telefonoRegistrado ?? null },
   {
@@ -408,7 +431,11 @@ function Paginacion({ pagina, totalPaginas, total, porPagina, onPagina, onPorPag
 }
 
 export default function Citas() {
-  const [dias, setDias] = useState(30);
+  // { dias } para los periodos fijos o { desde, hasta } (yyyy-mm-dd) para un rango personalizado, como en el panel
+  const [periodo, setPeriodo] = useState({ dias: 30 });
+  const [selectorAbierto, setSelectorAbierto] = useState(false);
+  const cerrarSelector = useCallback(() => setSelectorAbierto(false), []);
+  const clavePeriodo = periodo.desde ? `${periodo.desde}|${periodo.hasta}` : String(periodo.dias);
   const [datos, setDatos] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
@@ -426,7 +453,7 @@ export default function Citas() {
     let vivo = true;
     const cargar = () =>
       api
-        .citas(dias, forzar.current)
+        .citas(periodo, forzar.current)
         .then((d) => {
           if (!vivo) return;
           setDatos(d);
@@ -443,7 +470,14 @@ export default function Citas() {
       vivo = false;
       clearInterval(t);
     };
-  }, [dias, recarga]);
+    // clavePeriodo resume el periodo: solo se recarga si cambia el rango, no por un objeto nuevo igual
+  }, [clavePeriodo, recarga]);
+
+  const elegirPeriodo = (p) => {
+    setPeriodo(p);
+    setSelectorAbierto(false);
+    setPagina(1);
+  };
 
   const actualizar = useCallback(() => {
     forzar.current = true;
@@ -473,13 +507,18 @@ export default function Citas() {
       enCaja: pagadas.filter((c) => c.pago.estado !== 'PAGADA').length,
       atendidas: pagadas.filter((c) => c.estado === 'ATENDIDA').length,
       sinBoleta: pagadas.filter(faltaBoleta).length,
+      fueraDelChatbot: pagadas.filter(fueraDelChatbot).length,
     };
   }, [datos]);
 
   const visibles = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
-    const enFiltro = (c) =>
-      filtro === 'VIGENTES' ? c.estado !== 'ANULADA' : filtro === 'SIN_BOLETA' ? faltaBoleta(c) : c.estado === filtro;
+    const enFiltro = (c) => {
+      if (filtro === 'VIGENTES') return c.estado !== 'ANULADA';
+      if (filtro === 'SIN_BOLETA') return faltaBoleta(c);
+      if (filtro === 'FUERA_CHATBOT') return c.estado !== 'ANULADA' && fueraDelChatbot(c);
+      return c.estado === filtro;
+    };
     const lista = (datos?.citas ?? []).filter(
       (c) =>
         enFiltro(c) &&
@@ -545,16 +584,40 @@ export default function Citas() {
         <div>
           <h1>Citas agendadas</h1>
           <p className="tenue">
-            Por el chatbot
+            Por el chatbot o pagadas con su link · {descripcionPeriodo(periodo)}
             {lol?.configurado && lol.documentos > 0 && ` · Lolimsa consultado a las ${fmtHoraLima.format(new Date(lol.consultadoEn))}`}
           </p>
         </div>
-        <div className="periodos" role="group" aria-label="Agendadas en">
-          {PERIODOS.map((p) => (
-            <button key={p.dias} aria-pressed={dias === p.dias} onClick={() => setDias(p.dias)}>
-              {p.nombre}
+        <div className="filtro-periodo">
+          <div
+            className="periodos"
+            role="group"
+            aria-label="Agendadas en"
+            title="Según la fecha en que el bot agendó la cita (las reservadas fuera del chatbot, según su link de pago)"
+          >
+            {PERIODOS.map((p) => (
+              <button key={p.dias} aria-pressed={!periodo.desde && periodo.dias === p.dias} onClick={() => elegirPeriodo({ dias: p.dias })}>
+                {p.nombre}
+              </button>
+            ))}
+            <button
+              className="boton-rango"
+              aria-pressed={Boolean(periodo.desde)}
+              aria-expanded={selectorAbierto}
+              onClick={() => setSelectorAbierto((v) => !v)}
+            >
+              <IconoCalendario />
+              {periodo.desde ? textoRango(periodo.desde, periodo.hasta) : 'Personalizado'}
             </button>
-          ))}
+          </div>
+          {selectorAbierto && (
+            <SelectorFechas
+              desde={periodo.desde}
+              hasta={periodo.hasta}
+              onCerrar={cerrarSelector}
+              onAplicar={(desde, hasta) => elegirPeriodo({ desde, hasta })}
+            />
+          )}
         </div>
       </div>
 
@@ -614,6 +677,16 @@ export default function Citas() {
                   <span aria-hidden="true">!</span> {pagos.sinBoleta} con link sin boleta en caja
                 </button>
               )}
+              {pagos.fueraDelChatbot > 0 && (
+                <button
+                  className="filtro-sin-boleta fuera-chatbot"
+                  aria-pressed={filtro === 'FUERA_CHATBOT'}
+                  onClick={() => filtrar(filtro === 'FUERA_CHATBOT' ? 'VIGENTES' : 'FUERA_CHATBOT')}
+                  title={`${AYUDA_FUERA}. Clic para ver solo esas.`}
+                >
+                  {pagos.fueraDelChatbot} reservadas fuera del chatbot
+                </button>
+              )}
             </p>
           )}
 
@@ -628,7 +701,7 @@ export default function Citas() {
               <button className="boton-chico" onClick={actualizar} disabled={cargando}>
                 {cargando ? 'Consultando…' : 'Actualizar'}
               </button>
-              <button className="boton-chico" onClick={() => descargarCsv(visibles)} disabled={!visibles.length}>
+              <button className="boton-chico" onClick={() => descargarCsv(visibles, periodo)} disabled={!visibles.length}>
                 Descargar CSV
               </button>
             </div>
@@ -673,7 +746,15 @@ export default function Citas() {
                         </td>
                         <td>
                           <div className="numero-cita">N° {c.numero}</div>
-                          <div className="tenue chico">Agendada {momento(c.agendadaEn)}</div>
+                          {fueraDelChatbot(c) ? (
+                            <div className="origen-cita">
+                              <Insignia clase="info" icono="↗" title={AYUDA_FUERA}>
+                                Reservada fuera del chatbot
+                              </Insignia>
+                            </div>
+                          ) : (
+                            <div className="tenue chico">Agendada {momento(c.agendadaEn)}</div>
+                          )}
                         </td>
                         <td>
                           <div>{c.paciente.nombre ? titulo(c.paciente.nombre) : <span className="tenue">Sin nombre</span>}</div>
@@ -681,9 +762,11 @@ export default function Citas() {
                             {c.paciente.documento ? `${c.paciente.tipoDocumento ?? 'Doc.'} ${c.paciente.documento}` : 'Documento no identificado'}
                             {c.paciente.historia && ` · HC ${c.paciente.historia}`}
                           </div>
-                          <a className="chico" href={`#/${c.telefono}`} title={fmtTelefono(c.telefono)}>
-                            Ver conversación
-                          </a>
+                          {c.telefono && (
+                            <a className="chico" href={`#/${c.telefono}`} title={fmtTelefono(c.telefono)}>
+                              Ver conversación
+                            </a>
+                          )}
                         </td>
                         <td>
                           <Telefono paciente={c.paciente} />
